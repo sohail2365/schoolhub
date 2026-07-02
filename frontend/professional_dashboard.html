@@ -1131,6 +1131,23 @@
                     <label>Roll Number</label>
                     <input type="text" id="studentRoll" placeholder="Enter roll number">
                 </div>
+                <div class="form-group">
+                    <label>Date of Birth</label>
+                    <input type="date" id="studentDob">
+                </div>
+                <div class="form-group">
+                    <label>Gender</label>
+                    <select id="studentGender">
+                        <option value="">Select Gender</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label>Address</label>
+                    <textarea id="studentAddress" placeholder="Enter address" rows="2" style="resize: vertical;"></textarea>
+                </div>
             </div>
             <div class="btn-group">
                 <button class="btn btn-primary" id="studentSaveBtn" onclick="saveStudent()">Save Student</button>
@@ -1849,7 +1866,10 @@
                     email: document.getElementById("studentEmail").value || null,
                     phone: document.getElementById("studentPhone").value || null,
                     class_name: document.getElementById("studentClass").value,
-                    roll_number: document.getElementById("studentRoll").value
+                    roll_number: document.getElementById("studentRoll").value,
+                    date_of_birth: document.getElementById("studentDob").value || null,
+                    gender: document.getElementById("studentGender").value || null,
+                    address: document.getElementById("studentAddress").value || null
                 };
 
                 if (!payload.name || !payload.roll_number || !payload.class_name) {
@@ -1899,6 +1919,9 @@
             document.getElementById("studentPhone").value = "";
             document.getElementById("studentClass").value = "";
             document.getElementById("studentRoll").value = "";
+            document.getElementById("studentDob").value = "";
+            document.getElementById("studentGender").value = "";
+            document.getElementById("studentAddress").value = "";
             openModal("addStudentModal");
         }
 
@@ -1915,6 +1938,9 @@
             document.getElementById("studentPhone").value = student.phone || "";
             document.getElementById("studentClass").value = student.class_name || "";
             document.getElementById("studentRoll").value = student.roll_number || "";
+            document.getElementById("studentDob").value = student.date_of_birth ? student.date_of_birth.slice(0, 10) : "";
+            document.getElementById("studentGender").value = student.gender ? student.gender.charAt(0).toUpperCase() + student.gender.slice(1).toLowerCase() : "";
+            document.getElementById("studentAddress").value = student.address || "";
             openModal("addStudentModal");
         }
 
@@ -3619,7 +3645,6 @@
                     <tbody>
                         <tr><td><strong>Student Name</strong></td><td>${s.name}</td></tr>
                         <tr><td><strong>Father's Name</strong></td><td>${s.father_name || "-"}</td></tr>
-                        <tr><td><strong>Mother's Name</strong></td><td>${s.mother_name || "-"}</td></tr>
                         <tr><td><strong>Class</strong></td><td>${s.class_name || "-"}</td></tr>
                         <tr><td><strong>Roll Number</strong></td><td>${s.roll_number || "-"}</td></tr>
                         <tr><td><strong>Date of Birth</strong></td><td>${s.date_of_birth || "-"}</td></tr>
