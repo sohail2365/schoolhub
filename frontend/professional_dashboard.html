@@ -611,16 +611,79 @@
         }
 
         /* ==================== RESPONSIVE ==================== */
+        .hamburger-btn {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 4px 8px;
+            color: var(--dark);
+            margin-right: 12px;
+        }
+
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 998;
+        }
+
+        .sidebar-overlay.show {
+            display: block;
+        }
+
         @media (max-width: 768px) {
+            .hamburger-btn {
+                display: inline-block;
+            }
+
             .sidebar {
-                width: 100%;
-                height: auto;
-                padding: 15px;
-                position: relative;
+                width: 280px;
+                height: 100vh;
+                padding: 30px 0;
+                position: fixed;
+                transform: translateX(-100%);
+                transition: transform 0.25s ease-in-out;
+                z-index: 999;
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
             }
 
             .main-content {
                 margin-left: 0;
+            }
+
+            /* Tables become horizontally scrollable with the first column
+               pinned, so identifying info (name) stays visible while
+               swiping through the rest of the row on a small screen. */
+            .table-responsive {
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .table-responsive table th:first-child,
+            .table-responsive table td:first-child {
+                position: sticky;
+                left: 0;
+                background: white;
+                z-index: 1;
+                box-shadow: 2px 0 4px rgba(0, 0, 0, 0.06);
+            }
+
+            .table-responsive table th,
+            .table-responsive table td {
+                font-size: 13px;
+                padding: 8px 10px;
+                white-space: nowrap;
+            }
+
+            /* Bigger tap targets for action buttons on touch screens */
+            .btn-sm {
+                padding: 8px 12px;
+                font-size: 13px;
             }
 
             .metrics-grid {
@@ -636,7 +699,8 @@
             }
 
             .top-header {
-                flex-direction: column;
+                flex-direction: row;
+                flex-wrap: wrap;
                 gap: 15px;
             }
         }
@@ -659,6 +723,7 @@
 </head>
 <body>
     <div class="app-container">
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
         <!-- ==================== SIDEBAR ==================== -->
         <aside class="sidebar">
             <div class="sidebar-logo">
@@ -688,7 +753,10 @@
         <div class="main-content">
             <!-- ==================== HEADER ==================== -->
             <div class="top-header">
-                <h1 class="header-title" id="pageTitle">Dashboard</h1>
+                <div style="display: flex; align-items: center;">
+                    <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleSidebar()" aria-label="Toggle menu">☰</button>
+                    <h1 class="header-title" id="pageTitle">Dashboard</h1>
+                </div>
                 <div class="user-section">
                     <div class="user-avatar" id="userAvatar">U</div>
                     <div class="user-info">
@@ -1613,12 +1681,24 @@
             document.getElementById(modalId).classList.remove("show");
         }
 
+        // ==================== MOBILE SIDEBAR (hamburger drawer) ====================
+        function toggleSidebar() {
+            document.querySelector(".sidebar").classList.toggle("open");
+            document.getElementById("sidebarOverlay").classList.toggle("show");
+        }
+
+        function closeSidebar() {
+            document.querySelector(".sidebar").classList.remove("open");
+            document.getElementById("sidebarOverlay").classList.remove("show");
+        }
+
         function switchView(viewName) {
             document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
             document.getElementById(viewName + "View").classList.add("active");
             
             document.querySelectorAll(".menu-link").forEach(l => l.classList.remove("active"));
             document.querySelector(`[data-view="${viewName}"]`).classList.add("active");
+            closeSidebar();
             
             const titles = {
                 dashboard: "Dashboard",
