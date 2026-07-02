@@ -606,34 +606,13 @@
                 registerBtn.disabled = true;
                 registerBtn.innerHTML = '<span class="loading-spinner"></span>Creating Account...';
 
-                // Step 1: Create School
-                showDebugInfo(`Step 1: Creating school "${schoolName}"...`, 'registerDebugInfo');
-
-                const schoolResponse = await fetch(API_BASE + "/schools", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        name: schoolName,
-                        email: email,
-                        phone: phone || null,
-                        city: city || null
-                    })
-                });
-
-                log("School creation status: " + schoolResponse.status);
-                showDebugInfo("School creation response: " + schoolResponse.status, 'registerDebugInfo');
-
-                const schoolData = await schoolResponse.json();
-
-                if (!schoolResponse.ok) {
-                    throw new Error(parseErrorDetail(schoolData) || "Failed to create school");
-                }
-
-                const schoolId = schoolData.id;
-                showDebugInfo(`✅ School created with ID: ${schoolId}`, 'registerDebugInfo');
-
-                // Step 2: Create Admin User
-                showDebugInfo("Step 2: Creating admin user...", 'registerDebugInfo');
+                // Create school + admin account in one call.
+                // (Previously this made a separate POST /schools call first, but that
+                // endpoint creates a bare school record with no admin user attached —
+                // then /auth/register would try to create ANOTHER school with the same
+                // email and fail with "already exists". /auth/register alone already
+                // creates both the school and the admin user together.)
+                showDebugInfo(`Creating account for "${schoolName}"...`, 'registerDebugInfo');
 
                 const userResponse = await fetch(API_BASE + "/auth/register", {
                     method: "POST",
@@ -646,14 +625,17 @@
                     })
                 });
 
-                log("User creation status: " + userResponse.status);
-                showDebugInfo("User creation response: " + userResponse.status, 'registerDebugInfo');
+                log("Registration status: " + userResponse.status);
+                showDebugInfo("Registration response: " + userResponse.status, 'registerDebugInfo');
 
                 const userData = await userResponse.json();
 
-                // If /auth/register itself returns tokens directly (it creates its own school internally),
-                // treat that as success and skip duplicate school creation conflicts gracefully.
-                if (userResponse.ok && userData.access_token) {
+                if (!userResponse.ok) {
+                    throw new Error(parseErrorDetail(userData) || "Failed to create account");
+                }
+
+                // /auth/register returns tokens directly on success.
+                if (userData.access_token) {
                     localStorage.setItem("access_token", userData.access_token);
                     localStorage.setItem("user_role", userData.role || "admin");
                     localStorage.setItem("user_email", email);
@@ -664,14 +646,10 @@
                     return;
                 }
 
-                if (!userResponse.ok) {
-                    throw new Error(parseErrorDetail(userData) || "Failed to create user");
-                }
+                showDebugInfo("✅ Account created successfully", 'registerDebugInfo');
 
-                showDebugInfo("✅ User created successfully", 'registerDebugInfo');
-
-                // Step 3: Auto Login
-                showDebugInfo("Step 3: Auto-logging in...", 'registerDebugInfo');
+                // Fallback: Auto Login (only reached if /auth/register didn't return a token directly)
+                showDebugInfo("Step 2: Auto-logging in...", 'registerDebugInfo');
 
                 const loginResponse = await fetch(API_BASE + "/auth/login", {
                     method: "POST",
@@ -688,7 +666,7 @@
                     localStorage.setItem("access_token", loginData.access_token);
                     localStorage.setItem("user_role", loginData.role || "admin");
                     localStorage.setItem("user_email", email);
-                    localStorage.setItem("school_id", loginData.school_id || schoolId);
+                    localStorage.setItem("school_id", loginData.school_id);
 
                     showDebugInfo("✅ Auto-login successful! Redirecting...", 'registerDebugInfo');
                     showAlert("Account created successfully! Redirecting...", "success");
