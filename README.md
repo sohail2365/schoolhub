@@ -93,9 +93,10 @@ Use the registration page (`register.html`) to create your school, then log in w
 ## 🌐 Going Live (24/7, accessible from any device)
 
 Running on your own laptop only works while your laptop is on and connected.
-To give clients real 24/7 access from their phones, see **[DEPLOYMENT.md](./DEPLOYMENT.md)**
-for the full VPS setup guide — covers hosting, a production `.env` with a real
-secret key, systemd auto-restart, Nginx + free SSL, and automated daily backups.
+Two deployment paths, depending on budget:
+
+- **[VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md)** — Free (Vercel + Supabase Postgres). Good for a first pilot client. Has real trade-offs (no automatic backups, free-tier project auto-pause after inactivity) — read the "Honest limitations" section first.
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** — Paid VPS (~PKR 2,000–3,000/month). No pause/backup trade-offs, better fit once you have paying clients.
 
 ---
 

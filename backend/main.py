@@ -1,9 +1,11 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
+from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import traceback
 from sqlalchemy import inspect, text
-from backend.database import init_db, engine, SessionLocal
+from backend.database import init_db, engine, SessionLocal, get_db
+from backend.config import settings
 from backend.models.school import School
 from backend.models.user import User, UserRole
 from backend.utils.password import hash_password
@@ -97,61 +99,68 @@ async def startup():
         init_db()
         print("✅ Database tables created/verified")
         
-        # Check if demo account exists
-        db = SessionLocal()
-        try:
-            existing_school = db.query(School).filter(School.name == "Demo School").first()
-            existing_user = db.query(User).filter(User.email == "admin@school.com").first()
-            
-            if existing_school and existing_user:
-                print("✅ Demo data already exists")
-                print(f"   School: {existing_school.name}")
-                print(f"   Admin: {existing_user.email}")
-            else:
-                print("\n📝 Creating Demo Data...")
-                
-                # Create demo school
-                school = School(
-                    name="Demo School",
-                    email="admin@school.com",
-                    phone="03001234567",
-                    city="Lahore",
-                    address="Demo Address",
-                    password_hash=hash_password("admin123"),
-                )
-                db.add(school)
-                db.commit()
-                db.refresh(school)
-                print(f"✅ School created: {school.name} (ID: {school.id})")
+        # Demo account is only created in DEBUG mode (local development).
+        # In production (DEBUG=False, the default), this is skipped entirely —
+        # a publicly-known login (admin@school.com / admin123) has no place
+        # on a server hosting real schools' data, especially since this
+        # source code is on a public GitHub repo.
+        if settings.DEBUG:
+            db = SessionLocal()
+            try:
+                existing_school = db.query(School).filter(School.name == "Demo School").first()
+                existing_user = db.query(User).filter(User.email == "admin@school.com").first()
 
-                # Create demo admin user
-                admin_user = User(
-                    school_id=school.id,
-                    username="admin",
-                    email="admin@school.com",
-                    password_hash=hash_password("admin123"),
-                    full_name="Admin User",
-                    role=UserRole.admin,
-                    is_active=True,
-                )
-                db.add(admin_user)
-                db.commit()
-                db.refresh(admin_user)
-                print(f"✅ Admin user created: {admin_user.email}")
+                if existing_school and existing_user:
+                    print("✅ Demo data already exists")
+                    print(f"   School: {existing_school.name}")
+                    print(f"   Admin: {existing_user.email}")
+                else:
+                    print("\n📝 Creating Demo Data...")
 
-            print("\n" + "="*60)
-            print("✅ DATABASE INITIALIZATION COMPLETE!")
-            print("="*60)
-            print("\n📌 DEMO CREDENTIALS:")
-            print("   Email: admin@school.com")
-            print("   Password: admin123")
-            print("\n" + "="*60 + "\n")
+                    # Create demo school
+                    school = School(
+                        name="Demo School",
+                        email="admin@school.com",
+                        phone="03001234567",
+                        city="Lahore",
+                        address="Demo Address",
+                        password_hash=hash_password("admin123"),
+                    )
+                    db.add(school)
+                    db.commit()
+                    db.refresh(school)
+                    print(f"✅ School created: {school.name} (ID: {school.id})")
 
-        except Exception as e:
-            print(f"❌ Error creating demo data: {e}")
-            db.rollback()
-        finally:
-            db.close()
+                    # Create demo admin user
+                    admin_user = User(
+                        school_id=school.id,
+                        username="admin",
+                        email="admin@school.com",
+                        password_hash=hash_password("admin123"),
+                        full_name="Admin User",
+                        role=UserRole.admin,
+                        is_active=True,
+                    )
+                    db.add(admin_user)
+                    db.commit()
+                    db.refresh(admin_user)
+                    print(f"✅ Admin user created: {admin_user.email}")
+
+                print("\n" + "="*60)
+                print("✅ DATABASE INITIALIZATION COMPLETE!")
+                print("="*60)
+                print("\n📌 DEMO CREDENTIALS (DEBUG mode only):")
+                print("   Email: admin@school.com")
+                print("   Password: admin123")
+                print("\n" + "="*60 + "\n")
+
+            except Exception as e:
+                print(f"❌ Error creating demo data: {e}")
+                db.rollback()
+            finally:
+                db.close()
+        else:
+            print("✅ Database initialization complete (production mode — demo account skipped)")
 
     except Exception as e:
         print(f"❌ Database initialization failed: {e}")
@@ -190,6 +199,18 @@ async def health_check():
         "message": "Server is running",
         "cors": "enabled"
     }
+
+@app.get("/keep-alive")
+async def keep_alive(db: Session = Depends(get_db)):
+    """
+    Touches the database with a trivial query. Exists purely so an external
+    uptime pinger (e.g. UptimeRobot, free) can hit this every few days and
+    keep a free-tier Supabase project from auto-pausing due to inactivity.
+    /health above does NOT query the database, so it wouldn't count as
+    activity from Supabase's perspective — this endpoint specifically does.
+    """
+    db.execute(text("SELECT 1"))
+    return {"status": "alive"}
 
 @app.options("/{full_path:path}")
 async def preflight_handler(full_path: str):

@@ -7,3 +7,4 @@ backups/
 logs/*.log
 .venv/
 *.egg-info/
+.vercel/
