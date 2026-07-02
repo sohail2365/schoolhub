@@ -10,6 +10,7 @@ from .payment import Payment, PaymentMethod
 from .parent_student_link import ParentStudentLink
 from .announcement import Announcement
 from .staff import Staff, StaffStatus, StaffAttendance, StaffSalaryPayment
+from .password_reset import PasswordResetToken
 
 __all__ = [
     'School',
@@ -29,4 +30,5 @@ __all__ = [
     'StaffStatus',
     'StaffAttendance',
     'StaffSalaryPayment',
+    'PasswordResetToken',
 ]

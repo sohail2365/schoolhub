@@ -265,7 +265,23 @@
                 <input type="password" id="password" placeholder="Enter your password" required>
             </div>
 
+            <div style="text-align: right; margin-bottom: 16px;">
+                <a href="#" onclick="showForgotPasswordForm(event)" style="font-size: 13px; color: #667eea; text-decoration: none;">Forgot Password?</a>
+            </div>
+
             <button type="submit" class="login-btn" id="loginBtn">Sign In</button>
+        </form>
+
+        <!-- Forgot Password form (hidden by default, toggled by the link above) -->
+        <form id="forgotPasswordForm" onsubmit="handleForgotPassword(event)" style="display: none;">
+            <div class="form-group">
+                <label>Enter your account email</label>
+                <input type="email" id="forgotEmail" placeholder="your@email.com" required>
+            </div>
+            <button type="submit" class="login-btn" id="forgotPasswordBtn">Send Reset Link</button>
+            <div style="text-align: center; margin-top: 12px;">
+                <a href="#" onclick="showLoginForm(event)" style="font-size: 13px; color: #667eea; text-decoration: none;">Back to login</a>
+            </div>
         </form>
 
         <div class="demo-credentials">
@@ -285,18 +301,58 @@
             ? "http://127.0.0.1:8000"
             : window.location.origin;
 
-        function showAlert(message, type = "error") {
+        function showAlert(message, type = "error", redirect = true) {
             const alertId = type === "success" ? "successAlert" : "errorAlert";
             const alert = document.getElementById(alertId);
             alert.textContent = message;
             alert.classList.add("show");
 
-            if (type === "success") {
+            if (type === "success" && redirect) {
                 setTimeout(() => {
                     window.location.href = "professional_dashboard.html";
                 }, 1500);
             } else {
                 setTimeout(() => alert.classList.remove("show"), 4000);
+            }
+        }
+
+        function showForgotPasswordForm(event) {
+            event.preventDefault();
+            document.getElementById("loginForm").style.display = "none";
+            document.getElementById("forgotPasswordForm").style.display = "block";
+        }
+
+        function showLoginForm(event) {
+            event.preventDefault();
+            document.getElementById("forgotPasswordForm").style.display = "none";
+            document.getElementById("loginForm").style.display = "block";
+        }
+
+        async function handleForgotPassword(event) {
+            event.preventDefault();
+            const email = document.getElementById("forgotEmail").value;
+            const btn = document.getElementById("forgotPasswordBtn");
+            btn.disabled = true;
+            btn.textContent = "Sending...";
+
+            try {
+                const response = await fetch(API_BASE + "/auth/forgot-password", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email })
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert(data.message || "If that email is registered, a reset link has been sent.", "success", false);
+                } else {
+                    showAlert(data.detail || "Something went wrong. Please try again.", "error");
+                }
+            } catch (error) {
+                showAlert("Network error. Please try again.", "error");
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "Send Reset Link";
             }
         }
 
@@ -341,6 +397,10 @@
                 // Store token
                 localStorage.setItem("access_token", data.access_token);
                 localStorage.setItem("user_role", data.role || "user");
+                localStorage.setItem("user_full_name", data.full_name || "");
+                localStorage.setItem("user_email", data.email || "");
+                localStorage.setItem("school_id", data.school_id);
+                localStorage.setItem("school_name", data.school_name || "");
 
                 showAlert("Login successful! Redirecting...", "success");
             } catch (error) {

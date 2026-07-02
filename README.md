@@ -15,6 +15,8 @@ Backend: Python (FastAPI + SQLAlchemy + SQLite). Frontend: vanilla HTML/CSS/JS �
 - Grades/exam records per subject
 - Fee management: create, edit, delete, record partial/full payments
 - Announcements
+- Self-service password reset (via email, works even without SMTP configured — falls back to console logging for local dev)
+- CSV export for students and fees lists
 
 **WhatsApp-first parent communication** (no paid API — uses `wa.me` links, tap to send)
 - Fee reminders (pending & partial payments, with correct due amounts)

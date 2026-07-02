@@ -850,6 +850,7 @@
                                 </select>
                                 <button class="btn btn-secondary" onclick="clearStudentFilters()">Clear</button>
                                 <button class="btn btn-whatsapp" id="studentWhatsappBtn" onclick="openWhatsappBulkForSelectedStudents()" disabled>📱 WhatsApp Selected (<span id="selectedStudentCount">0</span>)</button>
+                                <button class="btn btn-secondary" onclick="exportStudentsToCSV()">📥 Export CSV</button>
                             </div>
                             <div class="table-responsive">
                                 <table>
@@ -883,6 +884,7 @@
                                 <button class="btn btn-whatsapp" onclick="openWhatsappBulkForFamilies()">👪 Family Reminders</button>
                                 <button class="btn btn-secondary" onclick="openClassDuesModal()">📊 Class-wise Dues</button>
                                 <button class="btn btn-secondary" onclick="openBulkFeeModal()">🏫 Generate for Class</button>
+                                <button class="btn btn-secondary" onclick="exportFeesToCSV()">📥 Export CSV</button>
                                 <button class="btn btn-primary" onclick="openAddFeeModal()">➕ Add Fee</button>
                             </div>
                         </div>
@@ -3478,10 +3480,20 @@
                 // Load initial dashboard
                 await loadDashboard();
 
-                // Set user info
-                document.getElementById("userName").textContent = "Admin User";
-                document.getElementById("userRole").textContent = "Administrator";
-                document.getElementById("userAvatar").textContent = "A";
+                // Set user info from actual login data (not hardcoded)
+                const displayName = localStorage.getItem("user_full_name") || localStorage.getItem("user_email") || "User";
+                const roleRaw = localStorage.getItem("user_role") || "admin";
+                const roleDisplay = roleRaw.charAt(0).toUpperCase() + roleRaw.slice(1);
+
+                document.getElementById("userName").textContent = displayName;
+                document.getElementById("userRole").textContent = roleDisplay;
+                document.getElementById("userAvatar").textContent = displayName.charAt(0).toUpperCase();
+
+                const schoolName = localStorage.getItem("school_name");
+                if (schoolName) {
+                    const logoText = document.querySelector(".sidebar-logo .logo span:last-child");
+                    if (logoText) logoText.textContent = schoolName;
+                }
             } catch (error) {
                 console.error("Error initializing:", error);
             }
@@ -3828,6 +3840,55 @@
         }
 
         // ==================== CLASS-WISE DUES (read-only, isolated) ====================
+        // ==================== CSV EXPORT (client-side, isolated) ====================
+        function downloadCSV(rows, filename) {
+            if (!rows || rows.length === 0) {
+                showAlert("No data to export", "error");
+                return;
+            }
+
+            const escapeCell = (val) => {
+                const str = (val === null || val === undefined) ? "" : String(val);
+                if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+                    return `"${str.replace(/"/g, '""')}"`;
+                }
+                return str;
+            };
+
+            const csvContent = rows.map(row => row.map(escapeCell).join(",")).join("\n");
+            const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" }); // BOM for Excel/Urdu text compatibility
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        function exportStudentsToCSV() {
+            const header = ["Name", "Father's Name", "Class", "Roll Number", "Phone", "Email", "Gender", "Date of Birth", "Address"];
+            const rows = [header, ...students.map(s => [
+                s.name, s.father_name || "", s.class_name || "", s.roll_number || "",
+                s.phone || "", s.email || "", s.gender || "", s.date_of_birth || "", s.address || ""
+            ])];
+            downloadCSV(rows, `students_${new Date().toISOString().slice(0, 10)}.csv`);
+        }
+
+        function exportFeesToCSV() {
+            const header = ["Student Name", "Class", "Fee Type", "Amount", "Paid", "Due", "Status", "Due Date", "Month"];
+            const rows = [header, ...cachedFeesForPayment.map(f => {
+                const student = cachedStudentsForFees.find(s => s.id === f.student_id);
+                return [
+                    student ? student.name : "Unknown", student ? student.class_name : "",
+                    f.fee_name || "", f.amount, f.paid_amount, f.due_amount, f.status,
+                    f.due_date || "", f.month || ""
+                ];
+            })];
+            downloadCSV(rows, `fees_${new Date().toISOString().slice(0, 10)}.csv`);
+        }
+
         async function openClassDuesModal() {
             document.getElementById("classDuesBody").innerHTML = "Loading...";
             openModal("classDuesModal");

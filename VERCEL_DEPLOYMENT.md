@@ -76,6 +76,17 @@ Copy the output — you'll paste it into Vercel as `JWT_SECRET` in the next step
 | `DEBUG` | `False` |
 | `CORS_ORIGINS` | `*` |
 
+**Optional — for password reset emails to actually send** (otherwise reset links only show up in Vercel's function logs, which isn't useful for real users):
+
+| Key | Value |
+|---|---|
+| `SMTP_HOST` | `smtp.gmail.com` |
+| `SMTP_PORT` | `587` |
+| `SMTP_USER` | Your Gmail address |
+| `SMTP_PASSWORD` | A Gmail [App Password](https://myaccount.google.com/apppasswords) (not your normal Gmail password) |
+| `SMTP_FROM_EMAIL` | Same as `SMTP_USER` |
+| `FRONTEND_BASE_URL` | Your live URL, e.g. `https://schoolhub-ivory.vercel.app` (used to build the reset link in the email) |
+
 6. Click **Deploy**
 
 Vercel will build and give you a live URL like `https://schoolhub.vercel.app`.

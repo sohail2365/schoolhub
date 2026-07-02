@@ -38,6 +38,18 @@ CORS_ORIGINS=*
 
 LOG_FILE=logs/app.log
 API_V1_PREFIX=/api/v1
+
+# Password reset emails (optional) — leave blank to log reset links to the
+# console instead of emailing them. Set these up for real deployments.
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASSWORD=
+SMTP_FROM_EMAIL=
+SMTP_FROM_NAME=School Hub
+
+# Set this to your real deployed URL once you have one.
+FRONTEND_BASE_URL=http://127.0.0.1:8000
 """
 
     with open(ENV_PATH, "w") as f:

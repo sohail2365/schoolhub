@@ -557,6 +557,8 @@
                 localStorage.setItem("user_role", data.role || "user");
                 localStorage.setItem("user_email", email);
                 localStorage.setItem("school_id", data.school_id);
+                localStorage.setItem("user_full_name", data.full_name || "");
+                localStorage.setItem("school_name", data.school_name || "");
 
                 log("Login successful");
                 showDebugInfo("✅ Login successful! Redirecting...", 'loginDebugInfo');
@@ -641,6 +643,8 @@
                     localStorage.setItem("user_role", userData.role || "admin");
                     localStorage.setItem("user_email", email);
                     localStorage.setItem("school_id", userData.school_id);
+                    localStorage.setItem("user_full_name", userData.full_name || "");
+                    localStorage.setItem("school_name", userData.school_name || "");
 
                     showDebugInfo("✅ Account created and logged in successfully!", 'registerDebugInfo');
                     showAlert("Account created successfully! Redirecting...", "success");
@@ -668,6 +672,8 @@
                     localStorage.setItem("user_role", loginData.role || "admin");
                     localStorage.setItem("user_email", email);
                     localStorage.setItem("school_id", loginData.school_id);
+                    localStorage.setItem("user_full_name", loginData.full_name || "");
+                    localStorage.setItem("school_name", loginData.school_name || "");
 
                     showDebugInfo("✅ Auto-login successful! Redirecting...", 'registerDebugInfo');
                     showAlert("Account created successfully! Redirecting...", "success");
