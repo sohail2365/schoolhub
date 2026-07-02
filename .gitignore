@@ -1,39 +1,9 @@
-﻿# Environment / secrets
-.env
-.env.*
-!.env.example
-config.py
-secrets.json
-
-# Python
 __pycache__/
-*.py[cod]
+*.pyc
+.env
+school.db
+school.db.bak
+backups/
+logs/*.log
 .venv/
-venv/
-env/
-.pytest_cache/
-.mypy_cache/
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
-
-# Logs
-logs/
-*.log
-
-# OS / Editor
-.DS_Store
-Thumbs.db
-.vscode/
-.idea/
-
-# Node
-node_modules/
-dist/
-build/
-
-# Misc
-*.bak
-*.tmp
+*.egg-info/

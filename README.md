@@ -78,11 +78,24 @@ python -m backend.main
 The API will be available at `http://127.0.0.1:8000`.
 Interactive API docs: `http://127.0.0.1:8000/docs`
 
-### 5. Open the frontend
-Open `frontend/professional_dashboard.html` directly in your browser (or `frontend/index.html` to start from the landing page). No build step needed — it talks to the API at `http://127.0.0.1:8000`.
+### 5. Open the app
+The backend now serves the frontend too — just open:
+```
+http://127.0.0.1:8000/login.html
+```
+(No separate frontend server needed. This also means the exact same code works unchanged once deployed to a real domain — no URLs to edit.)
 
 ### 6. Create your school account
-Use the registration page/endpoint to create your school, then log in with the admin credentials you set.
+Use the registration page (`register.html`) to create your school, then log in with the admin credentials you set.
+
+---
+
+## 🌐 Going Live (24/7, accessible from any device)
+
+Running on your own laptop only works while your laptop is on and connected.
+To give clients real 24/7 access from their phones, see **[DEPLOYMENT.md](./DEPLOYMENT.md)**
+for the full VPS setup guide — covers hosting, a production `.env` with a real
+secret key, systemd auto-restart, Nginx + free SSL, and automated daily backups.
 
 ---
 
@@ -111,8 +124,9 @@ schoolhub/
 ## ⚠️ Important Notes
 
 - **`school.db` is intentionally excluded from version control** (see `.gitignore`). It contains real student/parent data once you start using the app — never commit it to a public repository.
+- **Before deploying for real clients**, run `python backend/generate_env.py` to generate a proper `.env` with a random JWT secret. The default secret shipped in the code is public (visible to anyone who reads the repo) and must never be used in production — see [DEPLOYMENT.md](./DEPLOYMENT.md).
+- **Backups**: since this is multi-tenant (every school's data lives in one `school.db`), set up the automated backup cron job described in DEPLOYMENT.md before onboarding real paying clients — one file loss would affect everyone at once.
 - WhatsApp messaging uses `wa.me` links (opens WhatsApp with a pre-filled message) — this requires manually tapping "Send" per contact since it doesn't use the paid WhatsApp Business API. This keeps the system free to run.
-- Default JWT secret/config should be changed before any real production deployment — check `backend/config.py`.
 
 ---
 

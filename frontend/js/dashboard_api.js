@@ -1,6 +1,8 @@
 // Dashboard API Integration
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = (window.location.protocol === "file:" || !window.location.origin || window.location.origin === "null")
+    ? "http://127.0.0.1:8000"
+    : window.location.origin;
 
 // ============ FILTERS API ============
 
