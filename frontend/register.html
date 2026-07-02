@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Management System - Register</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --secondary: #7c3aed;
+            --accent: #ec4899;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #06b6d4;
+            --dark: #1f2937;
+            --light: #f9fafb;
+            --gray: #6b7280;
+            --border: #e5e7eb;
+        }
+
+        html, body {
+            height: 100%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .auth-container {
+            width: 100%;
+            max-width: 450px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 50px;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .auth-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo-icon { font-size: 60px; margin-bottom: 15px; }
+
+        .logo-text {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--dark);
+            margin-bottom: 10px;
+        }
+
+        .logo-subtitle { font-size: 14px; color: var(--gray); }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background: none;
+            font-weight: 600;
+            color: var(--gray);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .tab-button.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .tab-button:hover { color: var(--dark); }
+
+        .form-group { margin-bottom: 20px; }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: var(--dark);
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .form-group input::placeholder { color: #9ca3af; }
+
+        .password-strength {
+            margin-top: 6px;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--border);
+            overflow: hidden;
+        }
+
+        .password-strength-bar {
+            height: 100%;
+            width: 0%;
+            transition: all 0.3s;
+            border-radius: 2px;
+        }
+
+        .password-hint {
+            font-size: 11px;
+            color: var(--gray);
+            margin-top: 4px;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 13px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(37, 99, 235, 0.3);
+        }
+
+        .submit-btn:active { transform: translateY(0); }
+
+        .submit-btn.loading { opacity: 0.7; cursor: not-allowed; }
+        .submit-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+
+        .alert {
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        .alert.show { display: block; }
+
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border-left: 4px solid var(--success);
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border-left: 4px solid var(--danger);
+        }
+
+        .alert-info {
+            background: #cffafe;
+            color: #164e63;
+            border-left: 4px solid var(--info);
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .footer-text {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 13px;
+            color: var(--gray);
+        }
+
+        .footer-text a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .footer-text a:hover { text-decoration: underline; }
+
+        .demo-info {
+            background: #f0f9ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border-left: 4px solid var(--info);
+            display: none;
+        }
+
+        .demo-info.show { display: block; }
+
+        .demo-info h4 {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--dark);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .demo-info p {
+            font-size: 13px;
+            color: var(--gray);
+            margin: 4px 0;
+            font-family: 'Courier New', monospace;
+        }
+
+        .demo-btn {
+            background: var(--info);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 10px;
+            width: 100%;
+            transition: all 0.3s;
+        }
+
+        .demo-btn:hover { background: #0891b2; }
+
+        .debug-info {
+            background: #f3f4f6;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 15px;
+            font-size: 12px;
+            color: var(--dark);
+            display: none;
+            max-height: 150px;
+            overflow-y: auto;
+            font-family: monospace;
+            border: 1px solid #e5e7eb;
+        }
+
+        .debug-info.show { display: block; }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 480px) {
+            .auth-container { padding: 30px 20px; }
+            .logo-text { font-size: 24px; }
+            .logo-icon { font-size: 50px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-header">
+            <div class="logo-icon">🎓</div>
+            <div class="logo-text">SchoolHub</div>
+            <div class="logo-subtitle">Professional School Management</div>
+        </div>
+
+        <div class="alert alert-success" id="successAlert"></div>
+        <div class="alert alert-error" id="errorAlert"></div>
+        <div class="alert alert-info" id="infoAlert"></div>
+
+        <div class="tabs">
+            <button class="tab-button active" onclick="switchTab('login')">🔐 Login</button>
+            <button class="tab-button" onclick="switchTab('register')">✍️ Register</button>
+        </div>
+
+        <!-- LOGIN TAB -->
+        <div class="tab-content active" id="loginTab">
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="loginEmail" placeholder="your@email.com" value="admin@school.com" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="loginPassword" placeholder="Enter your password" value="admin123" required>
+                </div>
+
+                <button type="submit" class="submit-btn" id="loginBtn">Sign In</button>
+            </form>
+
+            <div class="demo-info show" id="demoLoginInfo">
+                <h4>📌 Demo Account (Pre-filled Above)</h4>
+                <p><strong>Email:</strong> admin@school.com</p>
+                <p><strong>Password:</strong> admin123</p>
+                <button type="button" class="demo-btn" onclick="useDemoAccount()">Use Demo Account</button>
+            </div>
+
+            <div class="debug-info" id="loginDebugInfo"></div>
+        </div>
+
+        <!-- REGISTER TAB -->
+        <div class="tab-content" id="registerTab">
+            <form id="registerForm" onsubmit="handleRegister(event)">
+                <div class="form-group">
+                    <label>School Name *</label>
+                    <input type="text" id="registerSchoolName" placeholder="Your school name" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Admin Full Name *</label>
+                    <input type="text" id="registerAdminName" placeholder="Your full name" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Email Address *</label>
+                    <input type="email" id="registerEmail" placeholder="your@email.com" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Password *</label>
+                    <input type="password" id="registerPassword" placeholder="At least 8 characters" required oninput="checkPasswordStrength()">
+                    <div class="password-strength">
+                        <div class="password-strength-bar" id="strengthBar"></div>
+                    </div>
+                    <div class="password-hint" id="passwordHint">Minimum 8 characters</div>
+                </div>
+
+                <div class="form-group">
+                    <label>Confirm Password *</label>
+                    <input type="password" id="registerPasswordConfirm" placeholder="Confirm password" required>
+                </div>
+
+                <div class="form-group">
+                    <label>School Phone (Optional)</label>
+                    <input type="tel" id="registerPhone" placeholder="e.g., 03001234567">
+                </div>
+
+                <div class="form-group">
+                    <label>School City (Optional)</label>
+                    <input type="text" id="registerCity" placeholder="e.g., Lahore">
+                </div>
+
+                <button type="submit" class="submit-btn" id="registerBtn">Create Account</button>
+            </form>
+
+            <div class="debug-info" id="registerDebugInfo"></div>
+        </div>
+
+        <div class="footer-text">
+            <p>© 2024 SchoolHub. All rights reserved.</p>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "http://127.0.0.1:8000";
+        let debugMode = true;
+
+        function log(message, logType = "info") {
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = `[${timestamp}] [${String(logType).toUpperCase()}]`;
+            console.log(prefix + " " + message);
+        }
+
+        function showDebugInfo(message, elementId) {
+            if (debugMode) {
+                const debugEl = document.getElementById(elementId);
+                const timestamp = new Date().toLocaleTimeString();
+                debugEl.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+                debugEl.scrollTop = debugEl.scrollHeight;
+            }
+        }
+
+        function switchTab(tabName) {
+            log("Switching to tab: " + tabName);
+
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            event.target.classList.add('active');
+
+            if (tabName === 'register') {
+                document.getElementById('demoLoginInfo').classList.remove('show');
+                document.getElementById('registerDebugInfo').classList.add('show');
+            } else {
+                document.getElementById('demoLoginInfo').classList.add('show');
+                document.getElementById('loginDebugInfo').classList.add('show');
+            }
+        }
+
+        function showAlert(message, alertType = "error") {
+            log("Alert [" + alertType + "]: " + message);
+
+            const alertMap = {
+                success: "successAlert",
+                error: "errorAlert",
+                info: "infoAlert"
+            };
+
+            const alertId = alertMap[alertType] || "errorAlert";
+            const alert = document.getElementById(alertId);
+            alert.textContent = message;
+            alert.classList.add("show");
+
+            if (alertType === "success") {
+                setTimeout(() => {
+                    window.location.href = "professional_dashboard.html";
+                }, 1500);
+            } else {
+                setTimeout(() => alert.classList.remove("show"), 5000);
+            }
+        }
+
+        function useDemoAccount() {
+            log("Using demo account");
+            document.getElementById("loginEmail").value = "admin@school.com";
+            document.getElementById("loginPassword").value = "admin123";
+        }
+
+        function checkPasswordStrength() {
+            const password = document.getElementById("registerPassword").value;
+            const bar = document.getElementById("strengthBar");
+            const hint = document.getElementById("passwordHint");
+
+            let strength = 0;
+            if (password.length >= 8) strength += 25;
+            if (password.length >= 12) strength += 25;
+            if (/[A-Z]/.test(password)) strength += 25;
+            if (/[0-9]/.test(password)) strength += 12.5;
+            if (/[^A-Za-z0-9]/.test(password)) strength += 12.5;
+
+            bar.style.width = strength + "%";
+
+            if (strength < 30) {
+                bar.style.background = "var(--danger)";
+                hint.textContent = "Weak password";
+            } else if (strength < 70) {
+                bar.style.background = "var(--warning)";
+                hint.textContent = "Medium strength";
+            } else {
+                bar.style.background = "var(--success)";
+                hint.textContent = "Strong password";
+            }
+        }
+
+        // Helper: safely turn any backend error detail into a readable string
+        function parseErrorDetail(data) {
+            if (!data) return "Unknown error";
+            const detail = data.detail;
+            if (!detail) return "Request failed";
+            if (typeof detail === "string") return detail;
+            if (Array.isArray(detail)) {
+                return detail.map(d => {
+                    const field = Array.isArray(d.loc) ? d.loc.join(".") : "field";
+                    return `${field}: ${d.msg}`;
+                }).join(", ");
+            }
+            try {
+                return JSON.stringify(detail);
+            } catch (e) {
+                return "Request failed";
+            }
+        }
+
+        async function handleLogin(event) {
+            event.preventDefault();
+            log("Login form submitted");
+
+            const email = document.getElementById("loginEmail").value;
+            const password = document.getElementById("loginPassword").value;
+            const loginBtn = document.getElementById("loginBtn");
+
+            if (!email || !password) {
+                showAlert("Please enter email and password", "error");
+                return;
+            }
+
+            try {
+                loginBtn.classList.add("loading");
+                loginBtn.disabled = true;
+                loginBtn.innerHTML = '<span class="loading-spinner"></span>Signing in...';
+
+                showDebugInfo("Sending login request to " + API_BASE + "/auth/login", 'loginDebugInfo');
+
+                const response = await fetch(API_BASE + "/auth/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email: email, password: password })
+                });
+
+                log("Login response status: " + response.status);
+                showDebugInfo("Response status: " + response.status, 'loginDebugInfo');
+
+                const data = await response.json();
+                log("Login response received");
+
+                if (!response.ok) {
+                    throw new Error(parseErrorDetail(data));
+                }
+
+                localStorage.setItem("access_token", data.access_token);
+                localStorage.setItem("user_role", data.role || "user");
+                localStorage.setItem("user_email", email);
+                localStorage.setItem("school_id", data.school_id);
+
+                log("Login successful");
+                showDebugInfo("✅ Login successful! Redirecting...", 'loginDebugInfo');
+                showAlert("Login successful! Redirecting...", "success");
+            } catch (error) {
+                log("Login error: " + error.message);
+                showDebugInfo("ERROR: " + error.message, 'loginDebugInfo');
+                showAlert("Login failed: " + error.message, "error");
+                loginBtn.classList.remove("loading");
+                loginBtn.disabled = false;
+                loginBtn.innerHTML = "Sign In";
+            }
+        }
+
+        async function handleRegister(event) {
+            event.preventDefault();
+            log("Registration form submitted");
+
+            const schoolName = document.getElementById("registerSchoolName").value;
+            const adminName = document.getElementById("registerAdminName").value;
+            const email = document.getElementById("registerEmail").value;
+            const password = document.getElementById("registerPassword").value;
+            const passwordConfirm = document.getElementById("registerPasswordConfirm").value;
+            const phone = document.getElementById("registerPhone").value;
+            const city = document.getElementById("registerCity").value;
+            const registerBtn = document.getElementById("registerBtn");
+
+            if (!schoolName || !adminName || !email || !password) {
+                showAlert("Please fill all required fields (*)", "error");
+                showDebugInfo("Validation failed: Missing required fields", 'registerDebugInfo');
+                return;
+            }
+
+            if (password.length < 8) {
+                showAlert("Password must be at least 8 characters", "error");
+                showDebugInfo("Password validation failed: Too short", 'registerDebugInfo');
+                return;
+            }
+
+            if (password !== passwordConfirm) {
+                showAlert("Passwords do not match", "error");
+                showDebugInfo("Password confirmation failed", 'registerDebugInfo');
+                return;
+            }
+
+            try {
+                registerBtn.classList.add("loading");
+                registerBtn.disabled = true;
+                registerBtn.innerHTML = '<span class="loading-spinner"></span>Creating Account...';
+
+                // Step 1: Create School
+                showDebugInfo(`Step 1: Creating school "${schoolName}"...`, 'registerDebugInfo');
+
+                const schoolResponse = await fetch(API_BASE + "/schools", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        name: schoolName,
+                        email: email,
+                        phone: phone || null,
+                        city: city || null
+                    })
+                });
+
+                log("School creation status: " + schoolResponse.status);
+                showDebugInfo("School creation response: " + schoolResponse.status, 'registerDebugInfo');
+
+                const schoolData = await schoolResponse.json();
+
+                if (!schoolResponse.ok) {
+                    throw new Error(parseErrorDetail(schoolData) || "Failed to create school");
+                }
+
+                const schoolId = schoolData.id;
+                showDebugInfo(`✅ School created with ID: ${schoolId}`, 'registerDebugInfo');
+
+                // Step 2: Create Admin User
+                showDebugInfo("Step 2: Creating admin user...", 'registerDebugInfo');
+
+                const userResponse = await fetch(API_BASE + "/auth/register", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        school_name: schoolName,
+                        email: email,
+                        password: password,
+                        admin_name: adminName
+                    })
+                });
+
+                log("User creation status: " + userResponse.status);
+                showDebugInfo("User creation response: " + userResponse.status, 'registerDebugInfo');
+
+                const userData = await userResponse.json();
+
+                // If /auth/register itself returns tokens directly (it creates its own school internally),
+                // treat that as success and skip duplicate school creation conflicts gracefully.
+                if (userResponse.ok && userData.access_token) {
+                    localStorage.setItem("access_token", userData.access_token);
+                    localStorage.setItem("user_role", userData.role || "admin");
+                    localStorage.setItem("user_email", email);
+                    localStorage.setItem("school_id", userData.school_id);
+
+                    showDebugInfo("✅ Account created and logged in successfully!", 'registerDebugInfo');
+                    showAlert("Account created successfully! Redirecting...", "success");
+                    return;
+                }
+
+                if (!userResponse.ok) {
+                    throw new Error(parseErrorDetail(userData) || "Failed to create user");
+                }
+
+                showDebugInfo("✅ User created successfully", 'registerDebugInfo');
+
+                // Step 3: Auto Login
+                showDebugInfo("Step 3: Auto-logging in...", 'registerDebugInfo');
+
+                const loginResponse = await fetch(API_BASE + "/auth/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email: email, password: password })
+                });
+
+                log("Auto-login status: " + loginResponse.status);
+                showDebugInfo("Auto-login response: " + loginResponse.status, 'registerDebugInfo');
+
+                const loginData = await loginResponse.json();
+
+                if (loginResponse.ok) {
+                    localStorage.setItem("access_token", loginData.access_token);
+                    localStorage.setItem("user_role", loginData.role || "admin");
+                    localStorage.setItem("user_email", email);
+                    localStorage.setItem("school_id", loginData.school_id || schoolId);
+
+                    showDebugInfo("✅ Auto-login successful! Redirecting...", 'registerDebugInfo');
+                    showAlert("Account created successfully! Redirecting...", "success");
+                } else {
+                    showAlert("Account created! Please login manually.", "info");
+                    showDebugInfo("Auto-login failed, user needs to login manually", 'registerDebugInfo');
+                    setTimeout(() => {
+                        document.getElementById("loginEmail").value = email;
+                        document.getElementById("loginPassword").value = password;
+                        switchTab('login');
+                    }, 1500);
+                }
+            } catch (error) {
+                log("Registration error: " + error.message);
+                showDebugInfo("ERROR: " + error.message, 'registerDebugInfo');
+                showAlert("Registration failed: " + error.message, "error");
+                registerBtn.classList.remove("loading");
+                registerBtn.disabled = false;
+                registerBtn.innerHTML = "Create Account";
+            }
+        }
+
+        window.addEventListener("load", () => {
+            const token = localStorage.getItem("access_token");
+            if (token) {
+                log("User already logged in, redirecting to dashboard");
+                window.location.href = "professional_dashboard.html";
+            }
+
+            log("Register page loaded successfully");
+            log("API Base: " + API_BASE);
+        });
+
+        document.addEventListener("keydown", (e) => {
+            if (e.ctrlKey && e.key === 'd') {
+                debugMode = !debugMode;
+                document.querySelectorAll('.debug-info').forEach(el => {
+                    el.classList.toggle('show');
+                });
+                log("Debug mode: " + (debugMode ? "ON" : "OFF"));
+            }
+        });
+    </script>
+</body>
+</html>

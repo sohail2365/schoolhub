@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Management System - Login</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --secondary: #7c3aed;
+            --accent: #ec4899;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #06b6d4;
+            --dark: #1f2937;
+            --light: #f9fafb;
+            --gray: #6b7280;
+            --border: #e5e7eb;
+        }
+
+        html, body {
+            height: 100%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 420px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 50px;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .logo-icon {
+            font-size: 60px;
+            margin-bottom: 15px;
+        }
+
+        .logo-text {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--dark);
+            margin-bottom: 10px;
+        }
+
+        .logo-subtitle {
+            font-size: 14px;
+            color: var(--gray);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: var(--dark);
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .form-group input::placeholder {
+            color: #9ca3af;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 13px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(37, 99, 235, 0.3);
+        }
+
+        .login-btn:active {
+            transform: translateY(0);
+        }
+
+        .login-btn.loading {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        .alert {
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border-left: 4px solid var(--danger);
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border-left: 4px solid var(--success);
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 13px;
+            color: var(--gray);
+        }
+
+        .demo-credentials {
+            background: #f0f9ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 25px;
+            border-left: 4px solid var(--info);
+        }
+
+        .demo-credentials h4 {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--dark);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .demo-credentials p {
+            font-size: 13px;
+            color: var(--gray);
+            margin: 4px 0;
+            font-family: 'Courier New', monospace;
+        }
+
+        .demo-btn {
+            background: var(--info);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: all 0.3s;
+            width: 100%;
+        }
+
+        .demo-btn:hover {
+            background: #0891b2;
+        }
+
+        @media (max-width: 480px) {
+            .login-container {
+                padding: 30px 20px;
+            }
+
+            .logo-text {
+                font-size: 24px;
+            }
+
+            .logo-icon {
+                font-size: 50px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <div class="logo-icon">🎓</div>
+            <div class="logo-text">SchoolHub</div>
+            <div class="logo-subtitle">Professional School Management System</div>
+        </div>
+
+        <div class="alert alert-error" id="errorAlert"></div>
+        <div class="alert alert-success" id="successAlert"></div>
+
+        <form id="loginForm" onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label>Email Address</label>
+                <input type="email" id="email" placeholder="your@email.com" required>
+            </div>
+
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="password" placeholder="Enter your password" required>
+            </div>
+
+            <button type="submit" class="login-btn" id="loginBtn">Sign In</button>
+        </form>
+
+        <div class="demo-credentials">
+            <h4>📌 Demo Credentials</h4>
+            <p><strong>Email:</strong> admin@school.com</p>
+            <p><strong>Password:</strong> admin123</p>
+            <button type="button" class="demo-btn" onclick="fillDemoCredentials()">Use Demo Account</button>
+        </div>
+
+        <div class="login-footer">
+            <p>© 2024 School Management System. All rights reserved.</p>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "http://127.0.0.1:8000";
+
+        function showAlert(message, type = "error") {
+            const alertId = type === "success" ? "successAlert" : "errorAlert";
+            const alert = document.getElementById(alertId);
+            alert.textContent = message;
+            alert.classList.add("show");
+
+            if (type === "success") {
+                setTimeout(() => {
+                    window.location.href = "professional_dashboard.html";
+                }, 1500);
+            } else {
+                setTimeout(() => alert.classList.remove("show"), 4000);
+            }
+        }
+
+        function fillDemoCredentials() {
+            document.getElementById("email").value = "admin@school.com";
+            document.getElementById("password").value = "admin123";
+        }
+
+        async function handleLogin(event) {
+            event.preventDefault();
+
+            const email = document.getElementById("email").value;
+            const password = document.getElementById("password").value;
+            const loginBtn = document.getElementById("loginBtn");
+
+            if (!email || !password) {
+                showAlert("Please enter both email and password", "error");
+                return;
+            }
+
+            try {
+                loginBtn.classList.add("loading");
+                loginBtn.textContent = "Signing in...";
+
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        password: password
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || "Login failed");
+                }
+
+                // Store token
+                localStorage.setItem("access_token", data.access_token);
+                localStorage.setItem("user_role", data.role || "user");
+
+                showAlert("Login successful! Redirecting...", "success");
+            } catch (error) {
+                showAlert(error.message || "Login failed. Please try again.", "error");
+                loginBtn.classList.remove("loading");
+                loginBtn.textContent = "Sign In";
+            }
+        }
+
+        // Check if already logged in
+        window.addEventListener("load", () => {
+            const token = localStorage.getItem("access_token");
+            if (token) {
+                window.location.href = "professional_dashboard.html";
+            }
+        });
+    </script>
+</body>
+</html>

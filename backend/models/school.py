@@ -1,0 +1,36 @@
+from datetime import datetime
+
+from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column
+
+from backend.database import Base
+
+
+class School(Base):
+    __tablename__ = "schools"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(150), unique=True, nullable=False, index=True)
+    email: Mapped[str] = mapped_column(String(150), unique=True, nullable=False, index=True)
+    phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    principal_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    # Settings
+    active_classes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    working_days: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
+
+    # Fee settings
+    fee_structure: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fee_due_day: Mapped[int] = mapped_column(Integer, default=10, nullable=False)
+    late_fee_percent: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
+
+    # Holidays
+    holidays: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
