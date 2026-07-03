@@ -69,10 +69,13 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     if not user.is_active:
         raise HTTPException(status_code=403, detail="User account is inactive")
 
+    school = db.query(School).filter(School.id == user.school_id).first()
+    if school and not school.is_active:
+        raise HTTPException(status_code=403, detail="This school's account has been deactivated. Please contact support.")
+
     token = create_access_token(
         {"school_id": user.school_id, "user_id": user.id, "role": user.role.value}
     )
-    school = db.query(School).filter(School.id == user.school_id).first()
     return AuthResponse(
         token=token, access_token=token, user_id=user.id, role=user.role.value, school_id=user.school_id,
         full_name=user.full_name, email=user.email, school_name=school.name if school else ""

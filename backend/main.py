@@ -14,6 +14,7 @@ from datetime import datetime
 from backend.routes import auth, students, attendance, grades, fees, dashboard, reports, announcements, schools, staff
 from backend.routes.filters import router as filters_router
 from backend.routes.settings import router as settings_router
+from backend.routes.superadmin import router as superadmin_router
 
 # ✅ NON-DESTRUCTIVE AUTO-MIGRATION
 # Base.metadata.create_all() only creates NEW tables — it never adds new
@@ -94,6 +95,7 @@ async def startup():
         # Heal any existing database that was created before these columns existed
         _ensure_column("schools", "city", "city VARCHAR(50)")
         _ensure_column("staff", "role", "role VARCHAR(20) NOT NULL DEFAULT 'teacher'")
+        _ensure_column("schools", "is_active", "is_active BOOLEAN NOT NULL DEFAULT TRUE")
 
         # Initialize all tables
         init_db()
@@ -191,6 +193,8 @@ app.include_router(filters_router, tags=["filters"])
 print("✅ Filters routes loaded")
 app.include_router(settings_router, tags=["settings"])
 print("✅ Settings routes loaded")
+app.include_router(superadmin_router, tags=["superadmin"])
+print("✅ Super admin routes loaded")
 
 @app.get("/health")
 async def health_check():

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Admin - SchoolHub Platform</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --primary: #1f2937;
+            --accent: #2563eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --gray: #6b7280;
+            --border: #e5e7eb;
+            --bg: #f9fafb;
+        }
+
+        html, body { height: 100%; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); }
+
+        .header {
+            background: var(--primary);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 { font-size: 18px; }
+        .header .badge { background: var(--danger); padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+
+        .container { max-width: 1100px; margin: 30px auto; padding: 0 20px; }
+
+        .gate {
+            max-width: 420px;
+            margin: 80px auto;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        .gate h2 { margin-bottom: 20px; }
+        .gate input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+        .gate button {
+            width: 100%;
+            padding: 12px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .gate .error { color: var(--danger); font-size: 13px; margin-top: 8px; display: none; }
+
+        .stats { display: flex; gap: 16px; margin-bottom: 24px; }
+        .stat-card {
+            flex: 1;
+            background: white;
+            padding: 18px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .stat-card .value { font-size: 26px; font-weight: 700; }
+        .stat-card .label { font-size: 12px; color: var(--gray); text-transform: uppercase; }
+
+        table { width: 100%; background: white; border-collapse: collapse; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13px; }
+        th { background: #f3f4f6; font-weight: 700; text-transform: uppercase; font-size: 11px; color: var(--gray); }
+
+        .badge-active { background: #d1fae5; color: #065f46; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+        .badge-inactive { background: #fee2e2; color: #991b1b; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+
+        .btn { padding: 6px 10px; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 600; margin-right: 4px; }
+        .btn-deactivate { background: var(--warning); color: white; }
+        .btn-reactivate { background: var(--success); color: white; }
+        .btn-delete { background: var(--danger); color: white; }
+
+        .empty { text-align: center; padding: 40px; color: var(--gray); }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <!-- Access gate: must enter the super admin secret key first -->
+    <div class="gate" id="gateScreen">
+        <h2>🔐 Super Admin Access</h2>
+        <p style="color: var(--gray); font-size: 13px; margin-bottom: 16px;">This panel is for the platform owner only. Enter your super admin key.</p>
+        <input type="password" id="secretKeyInput" placeholder="Super admin key">
+        <button onclick="unlockPanel()">Unlock</button>
+        <div class="error" id="gateError">Invalid key. Please try again.</div>
+    </div>
+
+    <!-- Main panel (hidden until unlocked) -->
+    <div id="mainPanel" class="hidden">
+        <div class="header">
+            <h1>🏫 SchoolHub — Platform Admin</h1>
+            <span class="badge">SUPER ADMIN</span>
+        </div>
+
+        <div class="container">
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="value" id="totalSchoolsStat">-</div>
+                    <div class="label">Total Schools</div>
+                </div>
+                <div class="stat-card">
+                    <div class="value" id="activeSchoolsStat">-</div>
+                    <div class="label">Active Schools</div>
+                </div>
+            </div>
+
+            <div id="tableContainer">
+                <p class="empty">Loading...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = (window.location.protocol === "file:" || !window.location.origin || window.location.origin === "null")
+            ? "http://127.0.0.1:8000"
+            : window.location.origin;
+
+        let superAdminKey = "";
+
+        async function unlockPanel() {
+            const key = document.getElementById("secretKeyInput").value;
+            if (!key) return;
+
+            // Validate the key by actually calling the API — not just storing it blindly.
+            try {
+                const response = await fetch(API_BASE + "/superadmin/schools", {
+                    headers: { "X-Super-Admin-Key": key }
+                });
+
+                if (!response.ok) {
+                    document.getElementById("gateError").style.display = "block";
+                    return;
+                }
+
+                superAdminKey = key;
+                sessionStorage.setItem("super_admin_key", key); // session-only, cleared when tab closes
+                document.getElementById("gateScreen").classList.add("hidden");
+                document.getElementById("mainPanel").classList.remove("hidden");
+
+                const data = await response.json();
+                renderSchools(data);
+            } catch (error) {
+                document.getElementById("gateError").textContent = "Network error. Please check your connection.";
+                document.getElementById("gateError").style.display = "block";
+            }
+        }
+
+        function renderSchools(data) {
+            document.getElementById("totalSchoolsStat").textContent = data.total_schools;
+            document.getElementById("activeSchoolsStat").textContent = data.active_schools;
+
+            const container = document.getElementById("tableContainer");
+            if (data.schools.length === 0) {
+                container.innerHTML = `<p class="empty">No schools registered yet.</p>`;
+                return;
+            }
+
+            const rows = data.schools.map(s => `
+                <tr>
+                    <td><strong>${s.name}</strong></td>
+                    <td>${s.email}</td>
+                    <td>${s.city || "-"}</td>
+                    <td>${s.student_count}</td>
+                    <td>${s.created_at ? new Date(s.created_at).toLocaleDateString() : "-"}</td>
+                    <td>${s.is_active ? '<span class="badge-active">Active</span>' : '<span class="badge-inactive">Deactivated</span>'}</td>
+                    <td>
+                        ${s.is_active
+                            ? `<button class="btn btn-deactivate" onclick="deactivateSchool(${s.id}, '${s.name.replace(/'/g, "\\'")}')">Deactivate</button>`
+                            : `<button class="btn btn-reactivate" onclick="reactivateSchool(${s.id}, '${s.name.replace(/'/g, "\\'")}')">Reactivate</button>`
+                        }
+                        <button class="btn btn-delete" onclick="deleteSchool(${s.id}, '${s.name.replace(/'/g, "\\'")}')">Delete</button>
+                    </td>
+                </tr>
+            `).join("");
+
+            container.innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>School</th><th>Email</th><th>City</th><th>Students</th><th>Registered</th><th>Status</th><th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+        }
+
+        async function refreshSchools() {
+            const response = await fetch(API_BASE + "/superadmin/schools", {
+                headers: { "X-Super-Admin-Key": superAdminKey }
+            });
+            const data = await response.json();
+            renderSchools(data);
+        }
+
+        async function deactivateSchool(id, name) {
+            if (!confirm(`Deactivate "${name}"? This blocks ALL logins for this school immediately (data is kept, not deleted).`)) return;
+            const response = await fetch(`${API_BASE}/superadmin/schools/${id}/deactivate`, {
+                method: "POST",
+                headers: { "X-Super-Admin-Key": superAdminKey }
+            });
+            const data = await response.json();
+            alert(data.message || "Done");
+            refreshSchools();
+        }
+
+        async function reactivateSchool(id, name) {
+            const response = await fetch(`${API_BASE}/superadmin/schools/${id}/reactivate`, {
+                method: "POST",
+                headers: { "X-Super-Admin-Key": superAdminKey }
+            });
+            const data = await response.json();
+            alert(data.message || "Done");
+            refreshSchools();
+        }
+
+        async function deleteSchool(id, name) {
+            const confirmation = prompt(`This PERMANENTLY deletes "${name}" and ALL its data (students, fees, staff — everything). This cannot be undone.\n\nType the school name exactly to confirm:`);
+            if (confirmation !== name) {
+                if (confirmation !== null) alert("Name didn't match. Deletion cancelled.");
+                return;
+            }
+
+            const response = await fetch(`${API_BASE}/superadmin/schools/${id}`, {
+                method: "DELETE",
+                headers: { "X-Super-Admin-Key": superAdminKey }
+            });
+            const data = await response.json();
+            alert(data.message || "Done");
+            refreshSchools();
+        }
+
+        // Auto-unlock if a key was already validated earlier this session
+        window.addEventListener("load", () => {
+            const savedKey = sessionStorage.getItem("super_admin_key");
+            if (savedKey) {
+                document.getElementById("secretKeyInput").value = savedKey;
+                unlockPanel();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -17,6 +17,7 @@ Backend: Python (FastAPI + SQLAlchemy + SQLite). Frontend: vanilla HTML/CSS/JS �
 - Announcements
 - Self-service password reset (via email, works even without SMTP configured — falls back to console logging for local dev)
 - CSV export for students and fees lists
+- Super Admin panel (platform owner only) — view all registered schools, deactivate/reactivate, or permanently delete a school's account. Separate from normal logins, protected by a secret key. See `superadmin.html`.
 
 **WhatsApp-first parent communication** (no paid API — uses `wa.me` links, tap to send)
 - Fee reminders (pending & partial payments, with correct due amounts)

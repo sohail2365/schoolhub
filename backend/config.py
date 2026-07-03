@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     # e.g. https://schoolhub-ivory.vercel.app
     FRONTEND_BASE_URL: str = "http://127.0.0.1:8000"
 
+    # Platform-owner access (super admin panel) — completely separate from
+    # normal school logins. Set this to a long random value in production;
+    # anyone with this key can see/deactivate/delete ANY school's account.
+    SUPER_ADMIN_SECRET: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

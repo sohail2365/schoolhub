@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.database import Base
@@ -17,6 +17,12 @@ class School(Base):
     address: Mapped[str | None] = mapped_column(Text, nullable=True)
     principal_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    # Platform-level control (used by the super admin panel). A deactivated
+    # school can't log in at all, but its data is preserved (not deleted) —
+    # use this for suspending a demo/spam signup without losing anything,
+    # and reserve hard deletion for genuine cleanup.
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     # Settings
     active_classes: Mapped[str | None] = mapped_column(Text, nullable=True)

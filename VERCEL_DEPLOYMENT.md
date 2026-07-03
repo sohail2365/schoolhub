@@ -87,6 +87,14 @@ Copy the output — you'll paste it into Vercel as `JWT_SECRET` in the next step
 | `SMTP_FROM_EMAIL` | Same as `SMTP_USER` |
 | `FRONTEND_BASE_URL` | Your live URL, e.g. `https://schoolhub-ivory.vercel.app` (used to build the reset link in the email) |
 
+**Optional — for the Super Admin panel** (platform owner access to see/deactivate/delete any school's account):
+
+| Key | Value |
+|---|---|
+| `SUPER_ADMIN_SECRET` | A long random value — generate one with `python -c "import secrets; print(secrets.token_urlsafe(32))"`. Keep this private; anyone with it can manage every school on your platform. |
+
+Access it at `https://your-app.vercel.app/superadmin.html` (not linked from anywhere in the normal app — bookmark it).
+
 6. Click **Deploy**
 
 Vercel will build and give you a live URL like `https://schoolhub.vercel.app`.

@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 from backend.config import settings
@@ -15,6 +15,18 @@ if DATABASE_URL.startswith("sqlite"):
         connect_args={"check_same_thread": False},
         echo=False,
     )
+
+    # SQLite does NOT enforce foreign key constraints by default (unlike
+    # every other real database), so ON DELETE CASCADE defined on the
+    # models silently does nothing unless this is turned on per-connection.
+    # Without this, deleting a school locally would leave orphaned users/
+    # students/fees behind — while the same delete on production (Postgres)
+    # correctly cascades. This keeps local dev behavior matching production.
+    @event.listens_for(engine, "connect")
+    def _enable_sqlite_foreign_keys(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 else:
     # Serverless platforms (e.g. Vercel) spin up short-lived function
     # instances — NullPool avoids leaking idle connections across
