@@ -12,6 +12,79 @@ from backend.utils.rbac import require_roles
 router = APIRouter(prefix="/attendance", tags=["attendance"])
 
 
+@router.get("/register/{class_name}")
+def attendance_register(
+    class_name: str,
+    month: str,  # format: YYYY-MM
+    token: dict = Depends(require_roles(["admin", "teacher"])),
+    db: Session = Depends(get_db),
+):
+    """
+    Class-wise monthly attendance register: every student in the class as
+    rows, every day of the month as columns (P/A/blank). Built for printing
+    the traditional paper register format schools are used to.
+    """
+    try:
+        year, mon = month.split("-")
+        year, mon = int(year), int(mon)
+        if not (1 <= mon <= 12):
+            raise ValueError
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Month must be in YYYY-MM format")
+
+    students = (
+        db.query(Student)
+        .filter(Student.school_id == token["school_id"], Student.class_name == class_name)
+        .order_by(Student.roll_number)
+        .all()
+    )
+    if not students:
+        raise HTTPException(status_code=404, detail="No students found in this class")
+
+    # Month boundaries
+    month_start = dt_date(year, mon, 1)
+    month_end = dt_date(year + 1, 1, 1) if mon == 12 else dt_date(year, mon + 1, 1)
+    days_in_month = (month_end - month_start).days
+
+    student_ids = [s.id for s in students]
+    records = (
+        db.query(Attendance)
+        .filter(
+            Attendance.school_id == token["school_id"],
+            Attendance.student_id.in_(student_ids),
+            Attendance.date >= month_start,
+            Attendance.date < month_end,
+        )
+        .all()
+    )
+
+    # student_id -> {day_number: is_present}
+    by_student: dict[int, dict[int, bool]] = {}
+    for r in records:
+        by_student.setdefault(r.student_id, {})[r.date.day] = r.is_present
+
+    rows = []
+    for s in students:
+        day_map = by_student.get(s.id, {})
+        present_count = sum(1 for v in day_map.values() if v)
+        marked_count = len(day_map)
+        rows.append({
+            "student_id": s.id,
+            "name": s.name,
+            "roll_number": s.roll_number,
+            "days": {str(d): day_map.get(d) for d in range(1, days_in_month + 1)},
+            "present_count": present_count,
+            "absent_count": marked_count - present_count,
+        })
+
+    return {
+        "class_name": class_name,
+        "month": month,
+        "days_in_month": days_in_month,
+        "students": rows,
+    }
+
+
 # ✅ NEW: List all attendance records for the school (optional date / student filters).
 # Purely additive — does not change any existing endpoint.
 @router.get("", response_model=list[AttendanceOut])

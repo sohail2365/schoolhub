@@ -936,6 +936,7 @@
                                 <button class="btn btn-sm btn-secondary" onclick="setAttendanceToday()">Today</button>
                                 <button class="btn btn-sm btn-secondary" onclick="clearAttendanceFilter()">Show All</button>
                                 <button class="btn btn-whatsapp" onclick="openWhatsappBulkForAbsentees()">📱 Send Absence Alerts</button>
+                                <button class="btn btn-secondary" onclick="openAttendanceRegisterModal()">📖 Print Register</button>
                             </div>
                             <div class="table-responsive">
                                 <table>
@@ -1316,6 +1317,28 @@
     </div>
 
     <!-- AI Summary/Report Modal (isolated, read-only AI output) -->
+    <!-- Attendance Register Modal (class + month picker for printable register) -->
+    <div class="modal" id="attendanceRegisterModal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeModal('attendanceRegisterModal')">✕</span>
+            <div class="modal-header">📖 Print Attendance Register</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Class</label>
+                    <select id="registerClassSelect"><option value="">Select Class</option></select>
+                </div>
+                <div class="form-group">
+                    <label>Month</label>
+                    <input type="month" id="registerMonthInput">
+                </div>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="printAttendanceRegister()">🖨️ Print Register</button>
+                <button class="btn btn-secondary" onclick="closeModal('attendanceRegisterModal')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal" id="aiResultModal">
         <div class="modal-content modal-wide">
             <span class="modal-close" onclick="closeModal('aiResultModal')">✕</span>
@@ -3694,7 +3717,7 @@
                     <thead><tr><th>Subject</th><th>Marks Obtained</th><th>Total Marks</th><th>Percentage</th><th>Grade</th></tr></thead>
                     <tbody>${rows}</tbody>
                 </table>
-                <div class="footer">Generated on ${new Date().toLocaleDateString()}</div>
+                <div class="footer">${school.name || "School"} — Generated on ${new Date().toLocaleDateString()}</div>
             `;
             openPrintWindow(`Report Card - ${s.name}`, bodyHtml);
         }
@@ -3746,7 +3769,7 @@
                         <div><strong>Father's Name:</strong> ${s.father_name || "-"}</div>
                         ${s.phone ? `<div><strong>Contact:</strong> ${s.phone}</div>` : ""}
                     </div>
-                    <div style="margin-top:12px; font-size:10px; color:#777; border-top:1px solid #ddd; padding-top:6px;">Student ID Card — ${new Date().getFullYear()}</div>
+                    <div style="margin-top:12px; font-size:10px; color:#777; border-top:1px solid #ddd; padding-top:6px;">${school.name || "School"} — Student ID Card ${new Date().getFullYear()}</div>
                 </div>
             `;
             openPrintWindow(`ID Card - ${s.name}`, bodyHtml);
@@ -3811,7 +3834,7 @@
                         <tr class="total-row"><td>Due Amount</td><td>Rs. ${fee.due_amount}</td></tr>
                     </tbody>
                 </table>
-                <div class="footer">This is a computer-generated receipt.</div>
+                <div class="footer">${school.name || "School"} — This is a computer-generated receipt.</div>
             `;
             openPrintWindow(`Receipt - ${student?.name || "Student"}`, bodyHtml);
         }
@@ -3976,6 +3999,104 @@
                 () => showAlert("Copied to clipboard", "success"),
                 () => showAlert("Copy failed", "error")
             );
+        }
+
+        // ==================== ATTENDANCE REGISTER (class-wise, printable) ====================
+        async function openAttendanceRegisterModal() {
+            // Populate class dropdown from loaded students (load if needed)
+            try {
+                if (!students || students.length === 0) {
+                    students = await apiRequest("/students");
+                }
+            } catch (error) {
+                console.error("Error loading students for register:", error);
+            }
+
+            const uniqueClasses = [...new Set(students.map(s => s.class_name).filter(Boolean))].sort();
+            const select = document.getElementById("registerClassSelect");
+            select.innerHTML = '<option value="">Select Class</option>' +
+                uniqueClasses.map(c => `<option value="${c}">${c}</option>`).join("");
+
+            // Default month = current month
+            const now = new Date();
+            document.getElementById("registerMonthInput").value =
+                `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+            openModal("attendanceRegisterModal");
+        }
+
+        async function printAttendanceRegister() {
+            const className = document.getElementById("registerClassSelect").value;
+            const month = document.getElementById("registerMonthInput").value;
+
+            if (!className || !month) {
+                showAlert("Class aur month dono select karein", "error");
+                return;
+            }
+
+            let data;
+            try {
+                data = await apiRequest(`/attendance/register/${encodeURIComponent(className)}?month=${month}`);
+            } catch (error) {
+                console.error("Error loading register:", error);
+                return;
+            }
+
+            const school = await getSchoolProfile();
+            const days = data.days_in_month;
+
+            const dayHeaders = Array.from({ length: days }, (_, i) => `<th style="min-width:18px; padding:3px 2px; font-size:9px;">${i + 1}</th>`).join("");
+
+            const studentRows = data.students.map((s, idx) => {
+                const dayCells = Array.from({ length: days }, (_, i) => {
+                    const v = s.days[String(i + 1)];
+                    const mark = v === true ? "P" : v === false ? '<span style="color:#c00; font-weight:700;">A</span>' : "";
+                    return `<td style="text-align:center; padding:3px 2px; font-size:9px;">${mark}</td>`;
+                }).join("");
+                return `
+                    <tr>
+                        <td style="font-size:10px; padding:3px 4px;">${idx + 1}</td>
+                        <td style="font-size:10px; padding:3px 4px; white-space:nowrap;">${s.name}</td>
+                        <td style="font-size:10px; padding:3px 4px; text-align:center;">${s.roll_number}</td>
+                        ${dayCells}
+                        <td style="font-size:10px; text-align:center; font-weight:700;">${s.present_count}</td>
+                        <td style="font-size:10px; text-align:center; font-weight:700; color:#c00;">${s.absent_count}</td>
+                    </tr>
+                `;
+            }).join("");
+
+            const monthLabel = new Date(month + "-01").toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+            const bodyHtml = `
+                <div class="header">
+                    <h1>${school.name || "School"}</h1>
+                    <div>${school.address || ""}</div>
+                    <h2 style="margin-top:10px;">Attendance Register — Class ${data.class_name}</h2>
+                    <div style="font-size:14px; margin-top:4px;">${monthLabel}</div>
+                </div>
+                <table style="border-collapse:collapse; width:100%;">
+                    <thead>
+                        <tr>
+                            <th style="font-size:10px; padding:3px 4px;">#</th>
+                            <th style="font-size:10px; padding:3px 4px;">Student Name</th>
+                            <th style="font-size:10px; padding:3px 4px;">Roll</th>
+                            ${dayHeaders}
+                            <th style="font-size:10px; padding:3px 2px;">P</th>
+                            <th style="font-size:10px; padding:3px 2px;">A</th>
+                        </tr>
+                    </thead>
+                    <tbody>${studentRows}</tbody>
+                </table>
+                <div style="margin-top:16px; font-size:11px;">P = Present &nbsp;&nbsp; A = Absent &nbsp;&nbsp; Blank = Not marked</div>
+                <div class="meta" style="margin-top:24px;">
+                    <div>Teacher's Signature: ______________</div>
+                    <div>Principal's Signature: ______________</div>
+                </div>
+                <div class="footer">${school.name || "School"} — Attendance Register (${monthLabel})</div>
+            `;
+
+            closeModal("attendanceRegisterModal");
+            openPrintWindow(`Attendance Register - Class ${data.class_name} - ${month}`, bodyHtml);
         }
 
         async function openClassDuesModal() {
