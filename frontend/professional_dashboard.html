@@ -851,6 +851,7 @@
                                 <button class="btn btn-secondary" onclick="clearStudentFilters()">Clear</button>
                                 <button class="btn btn-whatsapp" id="studentWhatsappBtn" onclick="openWhatsappBulkForSelectedStudents()" disabled>📱 WhatsApp Selected (<span id="selectedStudentCount">0</span>)</button>
                                 <button class="btn btn-secondary" onclick="exportStudentsToCSV()">📥 Export CSV</button>
+                                <button class="btn btn-secondary" onclick="generateAIClassReport()">✨ AI Class Report</button>
                             </div>
                             <div class="table-responsive">
                                 <table>
@@ -1294,6 +1295,7 @@
             <div class="btn-group">
                 <button class="btn btn-primary" id="studentProfileReportCardBtn" onclick="printReportCard()">🖨️ Print Report Card</button>
                 <button class="btn btn-whatsapp" onclick="shareReportCardOnWhatsapp()">📱 Share Report on WhatsApp</button>
+                <button class="btn btn-secondary" id="aiSummaryBtn" onclick="generateAISummary()">✨ AI Summary</button>
                 <button class="btn btn-secondary" onclick="printStudentIdCard()">🪪 Print ID Card</button>
                 <button class="btn btn-secondary" onclick="printAdmissionSlip()">📝 Print Admission Slip</button>
                 <button class="btn btn-secondary" onclick="closeModal('studentProfileModal')">Close</button>
@@ -1309,6 +1311,27 @@
             <div id="classDuesBody" style="max-height:65vh; max-height:65dvh; overflow-y:auto;">Loading...</div>
             <div class="btn-group">
                 <button class="btn btn-secondary" onclick="closeModal('classDuesModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Summary/Report Modal (isolated, read-only AI output) -->
+    <div class="modal" id="aiResultModal">
+        <div class="modal-content modal-wide">
+            <span class="modal-close" onclick="closeModal('aiResultModal')">✕</span>
+            <div class="modal-header" id="aiResultTitle">✨ AI Summary</div>
+            <div style="margin-bottom: 12px;">
+                <label style="font-size: 13px; margin-right: 8px;">Language:</label>
+                <select id="aiLanguageSelect" style="padding: 6px 10px; border: 2px solid var(--border); border-radius: 6px;">
+                    <option value="urdu">Roman Urdu</option>
+                    <option value="english">English</option>
+                </select>
+            </div>
+            <div id="aiResultBody" style="max-height:55vh; max-height:55dvh; overflow-y:auto; white-space:pre-wrap; line-height:1.7; padding:16px; background:var(--bg-secondary); border-radius:8px;">Click Generate to create the summary.</div>
+            <div class="btn-group">
+                <button class="btn btn-primary" id="aiGenerateBtn" onclick="runAIGeneration()">Generate</button>
+                <button class="btn btn-secondary" onclick="copyAIResult()">📋 Copy</button>
+                <button class="btn btn-secondary" onclick="closeModal('aiResultModal')">Close</button>
             </div>
         </div>
     </div>
@@ -3887,6 +3910,72 @@
                 ];
             })];
             downloadCSV(rows, `fees_${new Date().toISOString().slice(0, 10)}.csv`);
+        }
+
+        // ==================== AI FEATURES (read-only summaries via Groq) ====================
+        let aiMode = null;        // "student" or "class"
+        let aiTargetId = null;    // student id or class name
+
+        function generateAISummary() {
+            if (!currentProfileData) return;
+            aiMode = "student";
+            aiTargetId = currentProfileData.student.id;
+            document.getElementById("aiResultTitle").textContent = `✨ AI Summary — ${currentProfileData.student.name}`;
+            document.getElementById("aiResultBody").textContent = "Click Generate to create the summary.";
+            openModal("aiResultModal");
+        }
+
+        function generateAIClassReport() {
+            const className = document.getElementById("studentClassFilter").value;
+            if (!className) {
+                showAlert("Pehle class filter se koi class select karein, phir AI report banayein", "error");
+                return;
+            }
+            aiMode = "class";
+            aiTargetId = className;
+            document.getElementById("aiResultTitle").textContent = `✨ AI Class Report — Class ${className}`;
+            document.getElementById("aiResultBody").textContent = "Click Generate to create the report.";
+            openModal("aiResultModal");
+        }
+
+        async function runAIGeneration() {
+            const language = document.getElementById("aiLanguageSelect").value;
+            const btn = document.getElementById("aiGenerateBtn");
+            const body = document.getElementById("aiResultBody");
+
+            btn.disabled = true;
+            btn.textContent = "Generating...";
+            body.textContent = "⏳ AI soch raha hai... (10-20 seconds lag sakte hain)";
+
+            try {
+                const endpoint = aiMode === "student"
+                    ? `/ai/student-summary/${aiTargetId}`
+                    : `/ai/class-report/${encodeURIComponent(aiTargetId)}`;
+
+                const result = await apiRequest(endpoint, {
+                    method: "POST",
+                    body: JSON.stringify({ language })
+                });
+
+                body.textContent = result.summary || result.report || "No content returned.";
+            } catch (error) {
+                console.error("AI generation error:", error);
+                body.textContent = "❌ AI summary generate nahi ho saki. " +
+                    (error.message && error.message.includes("not configured")
+                        ? "Is server par AI features abhi configure nahi hain (GROQ_API_KEY set karni hogi)."
+                        : "Thori dair baad dobara try karein.");
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "Generate";
+            }
+        }
+
+        function copyAIResult() {
+            const text = document.getElementById("aiResultBody").textContent;
+            navigator.clipboard.writeText(text).then(
+                () => showAlert("Copied to clipboard", "success"),
+                () => showAlert("Copy failed", "error")
+            );
         }
 
         async function openClassDuesModal() {

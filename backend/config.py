@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     # anyone with this key can see/deactivate/delete ANY school's account.
     SUPER_ADMIN_SECRET: str = ""
 
+    # AI features (student summaries / class reports) via Groq. Optional —
+    # if not set, AI endpoints return a clear "not configured" message and
+    # everything else keeps working normally.
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

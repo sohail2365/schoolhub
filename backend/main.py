@@ -15,6 +15,7 @@ from backend.routes import auth, students, attendance, grades, fees, dashboard, 
 from backend.routes.filters import router as filters_router
 from backend.routes.settings import router as settings_router
 from backend.routes.superadmin import router as superadmin_router
+from backend.routes.ai import router as ai_router
 
 # ✅ NON-DESTRUCTIVE AUTO-MIGRATION
 # Base.metadata.create_all() only creates NEW tables — it never adds new
@@ -195,6 +196,8 @@ app.include_router(settings_router, tags=["settings"])
 print("✅ Settings routes loaded")
 app.include_router(superadmin_router, tags=["superadmin"])
 print("✅ Super admin routes loaded")
+app.include_router(ai_router, tags=["ai"])
+print("✅ AI routes loaded")
 
 @app.get("/health")
 async def health_check():

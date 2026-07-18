@@ -1,0 +1,226 @@
+"""
+AI-powered summaries and reports, using Groq's OpenAI-compatible API.
+
+Design principles:
+- READ-ONLY: these endpoints only read data and generate text. The LLM has
+  no ability to add/edit/delete anything — that's deliberate. Write-actions
+  via LLM are a Phase 2 feature that would need a confirmation flow.
+- FAIL-SAFE: if GROQ_API_KEY isn't configured or Groq is down/rate-limited,
+  these endpoints return a clear error message and nothing else in the app
+  is affected.
+- Data privacy note: student data (name, grades, attendance, fee totals) is
+  sent to Groq's API to generate the summary. Groq's API policy does not
+  train on API data, but school owners should know AI features send data to
+  a third-party service.
+"""
+import requests as http_requests
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from backend.config import settings
+from backend.database import get_db
+from backend.models.attendance import Attendance
+from backend.models.fee import Fee
+from backend.models.grade import Grade
+from backend.models.student import Student
+from backend.utils.rbac import require_roles
+
+router = APIRouter(prefix="/ai", tags=["ai"])
+
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+
+class AIRequest(BaseModel):
+    language: str = "urdu"  # "urdu" (Roman Urdu) or "english"
+
+
+def _call_groq(system_prompt: str, user_prompt: str) -> str:
+    if not settings.GROQ_API_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="AI features are not configured on this server (GROQ_API_KEY not set).",
+        )
+
+    try:
+        response = http_requests.post(
+            GROQ_URL,
+            headers={
+                "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": settings.GROQ_MODEL,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "temperature": 0.3,
+                "max_tokens": 900,
+            },
+            timeout=30,
+        )
+    except http_requests.RequestException:
+        raise HTTPException(status_code=502, detail="Could not reach the AI service. Please try again shortly.")
+
+    if response.status_code == 429:
+        raise HTTPException(status_code=429, detail="AI service rate limit reached. Please wait a minute and try again.")
+    if response.status_code != 200:
+        raise HTTPException(status_code=502, detail="AI service returned an error. Please try again shortly.")
+
+    try:
+        return response.json()["choices"][0]["message"]["content"].strip()
+    except (KeyError, IndexError, ValueError):
+        raise HTTPException(status_code=502, detail="AI service returned an unexpected response.")
+
+
+def _language_instruction(language: str) -> str:
+    if language == "english":
+        return "Write the response in simple, clear English."
+    return (
+        "Write the response in Roman Urdu (Urdu written in English letters, the way "
+        "Pakistanis type on WhatsApp), simple and friendly, understandable by a "
+        "school owner or parent who is not highly educated. Keep numbers in digits."
+    )
+
+
+@router.post("/student-summary/{student_id}")
+def ai_student_summary(
+    student_id: int,
+    payload: AIRequest,
+    token: dict = Depends(require_roles(["admin", "teacher"])),
+    db: Session = Depends(get_db),
+):
+    student = (
+        db.query(Student)
+        .filter(Student.id == student_id, Student.school_id == token["school_id"])
+        .first()
+    )
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    attendance_records = (
+        db.query(Attendance)
+        .filter(Attendance.school_id == token["school_id"], Attendance.student_id == student_id)
+        .all()
+    )
+    total_marked = len(attendance_records)
+    present = sum(1 for a in attendance_records if a.is_present)
+    attendance_rate = round((present / total_marked) * 100, 1) if total_marked else None
+
+    grades = (
+        db.query(Grade)
+        .filter(Grade.school_id == token["school_id"], Grade.student_id == student_id)
+        .all()
+    )
+    grade_lines = "\n".join(
+        f"- {g.subject}: {g.marks_obtained}/{g.total_marks} ({g.percentage}%)" for g in grades
+    ) or "No grades recorded yet."
+
+    fees = (
+        db.query(Fee)
+        .filter(Fee.school_id == token["school_id"], Fee.student_id == student_id)
+        .all()
+    )
+    total_fee = round(sum(f.amount for f in fees), 2)
+    total_paid = round(sum(f.paid_amount for f in fees), 2)
+    total_due = round(total_fee - total_paid, 2)
+
+    data_block = f"""Student: {student.name} (Class {student.class_name}, Roll {student.roll_number})
+Father's Name: {student.father_name or 'Not recorded'}
+
+Attendance: {"No attendance records yet." if attendance_rate is None else f"{present} present out of {total_marked} marked days ({attendance_rate}%)"}
+
+Grades:
+{grade_lines}
+
+Fees: Total Rs. {total_fee}, Paid Rs. {total_paid}, Outstanding Rs. {total_due}"""
+
+    system = (
+        "You are an assistant for a school management system in Pakistan. "
+        "Given a student's data, write a short, honest performance summary for the "
+        "school owner/parent: 1) overall academic performance, 2) attendance pattern, "
+        "3) fee status, 4) one practical suggestion. Be specific with numbers. "
+        "Do not invent any information not present in the data. "
+        + _language_instruction(payload.language)
+    )
+
+    summary = _call_groq(system, data_block)
+    return {"student_id": student_id, "student_name": student.name, "summary": summary}
+
+
+@router.post("/class-report/{class_name}")
+def ai_class_report(
+    class_name: str,
+    payload: AIRequest,
+    token: dict = Depends(require_roles(["admin", "teacher"])),
+    db: Session = Depends(get_db),
+):
+    students = (
+        db.query(Student)
+        .filter(Student.school_id == token["school_id"], Student.class_name == class_name)
+        .all()
+    )
+    if not students:
+        raise HTTPException(status_code=404, detail="No students found in this class")
+
+    student_ids = [s.id for s in students]
+
+    attendance_records = (
+        db.query(Attendance)
+        .filter(Attendance.school_id == token["school_id"], Attendance.student_id.in_(student_ids))
+        .all()
+    )
+    total_marked = len(attendance_records)
+    present = sum(1 for a in attendance_records if a.is_present)
+    class_attendance = round((present / total_marked) * 100, 1) if total_marked else None
+
+    grades = (
+        db.query(Grade)
+        .filter(Grade.school_id == token["school_id"], Grade.student_id.in_(student_ids))
+        .all()
+    )
+    avg_pct = round(sum(g.percentage for g in grades) / len(grades), 1) if grades else None
+
+    # Per-subject averages
+    subject_totals: dict[str, list[float]] = {}
+    for g in grades:
+        subject_totals.setdefault(g.subject, []).append(g.percentage)
+    subject_lines = "\n".join(
+        f"- {subj}: average {round(sum(pcts)/len(pcts), 1)}% across {len(pcts)} result(s)"
+        for subj, pcts in subject_totals.items()
+    ) or "No grades recorded yet."
+
+    fees = (
+        db.query(Fee)
+        .filter(Fee.school_id == token["school_id"], Fee.student_id.in_(student_ids))
+        .all()
+    )
+    total_fee = round(sum(f.amount for f in fees), 2)
+    total_paid = round(sum(f.paid_amount for f in fees), 2)
+    total_due = round(total_fee - total_paid, 2)
+    collection_rate = round((total_paid / total_fee) * 100, 1) if total_fee else None
+
+    data_block = f"""Class: {class_name}
+Number of students: {len(students)}
+
+Attendance: {"No attendance records yet." if class_attendance is None else f"{class_attendance}% overall ({present}/{total_marked} marked entries present)"}
+
+Academic (subject-wise averages):
+{subject_lines}
+Overall average: {"No grades yet." if avg_pct is None else f"{avg_pct}%"}
+
+Fees: Total Rs. {total_fee}, Collected Rs. {total_paid}, Outstanding Rs. {total_due}{"" if collection_rate is None else f" ({collection_rate}% collected)"}"""
+
+    system = (
+        "You are an assistant for a school management system in Pakistan. "
+        "Given a class's aggregated data, write a short report for the school owner: "
+        "1) overall academic health of the class (highlight weakest and strongest subjects), "
+        "2) attendance situation, 3) fee collection situation, 4) two practical, specific "
+        "suggestions. Be honest — if something is weak, say so plainly. "
+        "Do not invent any information not present in the data. "
+        + _language_instruction(payload.language)
+    )
+
+    report = _call_groq(system, data_block)
+    return {"class_name": class_name, "student_count": len(students), "report": report}

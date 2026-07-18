@@ -95,6 +95,14 @@ Copy the output — you'll paste it into Vercel as `JWT_SECRET` in the next step
 
 Access it at `https://your-app.vercel.app/superadmin.html` (not linked from anywhere in the normal app — bookmark it).
 
+**Optional — for AI features** (student summaries & class reports):
+
+| Key | Value |
+|---|---|
+| `GROQ_API_KEY` | Free API key from [console.groq.com](https://console.groq.com) |
+
+Without this, the AI buttons show a clear "not configured" message and everything else works normally. Note: AI features send student data (names, grades, attendance, fee totals) to Groq's API to generate summaries — mention this to schools if they ask about data privacy.
+
 6. Click **Deploy**
 
 Vercel will build and give you a live URL like `https://schoolhub.vercel.app`.

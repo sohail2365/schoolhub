@@ -18,6 +18,7 @@ Backend: Python (FastAPI + SQLAlchemy + SQLite). Frontend: vanilla HTML/CSS/JS �
 - Self-service password reset (via email, works even without SMTP configured — falls back to console logging for local dev)
 - CSV export for students and fees lists
 - Super Admin panel (platform owner only) — view all registered schools, deactivate/reactivate, or permanently delete a school's account. Separate from normal logins, protected by a secret key. See `superadmin.html`.
+- ✨ AI summaries (optional, via Groq) — one-click AI-generated performance summary for any student, and class-level AI reports (academics, attendance, fee collection + suggestions), in Roman Urdu or English. Read-only by design — the AI cannot modify any data.
 
 **WhatsApp-first parent communication** (no paid API — uses `wa.me` links, tap to send)
 - Fee reminders (pending & partial payments, with correct due amounts)
