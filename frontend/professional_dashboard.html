@@ -750,6 +750,8 @@
                 <li><a class="menu-link" data-view="staff"><span class="icon">🧑‍🏫</span> Staff</a></li>
                 <li><a class="menu-link" data-view="announcements"><span class="icon">📢</span> Announcements</a></li>
                 <li><a class="menu-link" data-view="settings"><span class="icon">⚙️</span> Settings</a></li>
+                <li><a class="menu-link" href="student-documents.html"><span class="icon">🪪</span> Student Documents</a></li>
+                <li><a class="menu-link" href="teacher-login.html" target="_blank"><span class="icon">🧑‍💻</span> Teacher Portal</a></li>
             </ul>
 
             <div style="position: absolute; bottom: 20px; left: 20px; right: 20px;">
@@ -3519,7 +3521,9 @@
                 // Setup menu links
                 document.querySelectorAll(".menu-link").forEach(link => {
                     link.addEventListener("click", (e) => {
-                        switchView(e.target.closest("a").dataset.view);
+                        const view = e.target.closest("a").dataset.view;
+                        if (!view) return; // plain link (e.g. Student Documents/Teacher Portal) — let it navigate normally
+                        switchView(view);
                     });
                 });
 
