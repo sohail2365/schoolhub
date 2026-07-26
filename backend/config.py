@@ -41,6 +41,22 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
 
+    # Supabase Storage (for student photos, ID cards, B-forms, test paper
+    # scans). Vercel's filesystem is ephemeral/read-only at runtime, so
+    # uploaded files CANNOT be saved to local disk — they must go to an
+    # external object store. Uses the same Supabase project as the database.
+    # Get these from Supabase dashboard -> Project Settings -> API:
+    #   SUPABASE_URL = https://<project-ref>.supabase.co
+    #   SUPABASE_SERVICE_KEY = the "service_role" secret key (NOT the anon key —
+    #     the service role key is required to upload from the backend and
+    #     must never be exposed to the frontend/browser)
+    # Then create a bucket named "student-files" (Storage -> New bucket).
+    # If these are not set, upload endpoints return a clear "not configured"
+    # error and everything else keeps working normally.
+    SUPABASE_URL: str = ""
+    SUPABASE_SERVICE_KEY: str = ""
+    SUPABASE_BUCKET: str = "student-files"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

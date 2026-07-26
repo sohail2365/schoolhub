@@ -16,6 +16,9 @@ from backend.routes.filters import router as filters_router
 from backend.routes.settings import router as settings_router
 from backend.routes.superadmin import router as superadmin_router
 from backend.routes.ai import router as ai_router
+from backend.routes.uploads import router as uploads_router
+from backend.routes.test_records import router as test_records_router
+from backend.routes.teacher import router as teacher_router
 
 # ✅ NON-DESTRUCTIVE AUTO-MIGRATION
 # Base.metadata.create_all() only creates NEW tables — it never adds new
@@ -97,6 +100,8 @@ async def startup():
         _ensure_column("schools", "city", "city VARCHAR(50)")
         _ensure_column("staff", "role", "role VARCHAR(20) NOT NULL DEFAULT 'teacher'")
         _ensure_column("schools", "is_active", "is_active BOOLEAN NOT NULL DEFAULT TRUE")
+        _ensure_column("students", "photo_url", "photo_url VARCHAR(500)")
+        _ensure_column("staff", "user_id", "user_id INTEGER")
 
         # Initialize all tables
         init_db()
@@ -198,6 +203,12 @@ app.include_router(superadmin_router, tags=["superadmin"])
 print("✅ Super admin routes loaded")
 app.include_router(ai_router, tags=["ai"])
 print("✅ AI routes loaded")
+app.include_router(uploads_router, tags=["student-documents"])
+print("✅ Student document upload routes loaded")
+app.include_router(test_records_router, tags=["test-records"])
+print("✅ Test record routes loaded")
+app.include_router(teacher_router, tags=["teacher-portal"])
+print("✅ Teacher portal routes loaded")
 
 @app.get("/health")
 async def health_check():

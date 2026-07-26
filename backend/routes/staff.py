@@ -1,3 +1,4 @@
+import secrets
 from datetime import date as dt_date
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -5,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.models.staff import Staff, StaffAttendance, StaffRole, StaffSalaryPayment, StaffStatus
+from backend.models.user import User, UserRole
 from backend.schemas.staff import (
     StaffAttendanceCreate,
     StaffAttendanceOut,
@@ -15,6 +17,7 @@ from backend.schemas.staff import (
     StaffSalaryPaymentOut,
     StaffUpdate,
 )
+from backend.utils.password import hash_password
 from backend.utils.rbac import require_roles
 
 router = APIRouter(prefix="/staff", tags=["staff"])
@@ -129,6 +132,76 @@ def delete_staff(
     db.delete(staff)
     db.commit()
     return None
+
+
+# ==================== TEACHER PORTAL LOGIN ====================
+
+@router.post("/{staff_id}/create-login", status_code=status.HTTP_201_CREATED)
+def create_teacher_login(
+    staff_id: int,
+    token: dict = Depends(require_roles(["admin"])),
+    db: Session = Depends(get_db),
+):
+    """
+    Creates (or resets) portal login access for a staff member, so they can
+    sign in to the Teacher Portal. Requires the staff record to have an
+    email set. Returns a one-time temporary password — the admin must share
+    this with the teacher; it is NOT stored anywhere retrievable afterwards.
+    """
+    staff = db.query(Staff).filter(Staff.id == staff_id, Staff.school_id == token["school_id"]).first()
+    if not staff:
+        raise HTTPException(status_code=404, detail="Staff member not found")
+    if not staff.email:
+        raise HTTPException(
+            status_code=422,
+            detail="This staff member has no email on file. Add one before creating a login.",
+        )
+
+    temp_password = secrets.token_urlsafe(9)  # readable-ish, ~12 chars
+
+    if staff.user_id:
+        # Login already exists — reset the password instead of creating a duplicate user.
+        user = db.query(User).filter(User.id == staff.user_id).first()
+        if not user:
+            staff.user_id = None  # orphaned link, fall through to create a fresh one
+        else:
+            user.password_hash = hash_password(temp_password)
+            user.is_active = True
+            db.commit()
+            return {
+                "message": "Password reset for existing teacher login.",
+                "email": user.email,
+                "temporary_password": temp_password,
+            }
+
+    existing_user = db.query(User).filter(User.email == staff.email).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=409,
+            detail="A login with this email already exists for a different account.",
+        )
+
+    user_role = UserRole.teacher if staff.role == StaffRole.teacher else UserRole.staff
+    user = User(
+        school_id=token["school_id"],
+        username=staff.email.split("@")[0],
+        email=staff.email,
+        password_hash=hash_password(temp_password),
+        full_name=staff.name,
+        role=user_role,
+        is_active=True,
+    )
+    db.add(user)
+    db.flush()
+
+    staff.user_id = user.id
+    db.commit()
+
+    return {
+        "message": "Teacher portal login created.",
+        "email": user.email,
+        "temporary_password": temp_password,
+    }
 
 
 # ==================== STAFF ATTENDANCE ====================

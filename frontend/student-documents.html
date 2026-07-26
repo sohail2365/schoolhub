@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Student Documents - SchoolHub</title>
+<link rel="stylesheet" href="css/style.css" />
+<style>
+  body { background: #f4f6f9; margin: 0; font-family: inherit; }
+  .topbar { background: #1e293b; color: #fff; padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; }
+  .container { max-width: 800px; margin: 1.5rem auto; padding: 0 1rem; }
+  .card { background: #fff; border-radius: 10px; padding: 1.2rem 1.4rem; margin-bottom: 1.2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+  select, input, button { padding: 0.5rem 0.7rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9rem; }
+  .row-form { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
+  .row-form button { background: #16a34a; color: #fff; border: none; cursor: pointer; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid #eee; }
+  .msg { font-size: 0.85rem; margin-top: 0.5rem; }
+  .msg.error { color: #dc2626; } .msg.ok { color: #16a34a; }
+  .doc-tag { display:inline-block; padding:0.15rem 0.55rem; border-radius:999px; background:#e0e7ff; color:#3730a3; font-size:0.78rem; }
+  a.back { color: #cbd5e1; text-decoration: none; font-size: 0.9rem; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <h1 style="font-size:1.1rem;margin:0;">Student Documents</h1>
+    <a class="back" href="professional_dashboard.html">← Back to dashboard</a>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <div class="row-form">
+        <label for="classSelect">Class:</label>
+        <select id="classSelect"><option value="">Select class</option></select>
+        <label for="studentSelect">Student:</label>
+        <select id="studentSelect"><option value="">Select student</option></select>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:1rem;">Upload Document / Photo</h2>
+      <div class="row-form">
+        <select id="docType">
+          <option value="profile_photo">Card Photo (profile)</option>
+          <option value="id_card">ID Card scan</option>
+          <option value="b_form">B-Form / CNIC</option>
+          <option value="test_paper">Test Paper photo</option>
+          <option value="other">Other</option>
+        </select>
+        <input type="text" id="docLabel" placeholder="Label (optional, e.g. 'July test')" style="width:220px" />
+        <input type="file" id="docFile" accept="image/*,application/pdf" />
+        <button onclick="uploadDoc()">Upload</button>
+      </div>
+      <div class="msg" id="uploadMsg"></div>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:1rem;">Uploaded Documents</h2>
+      <table>
+        <thead><tr><th>Type</th><th>Label</th><th>File</th><th>Uploaded</th><th></th><th></th></tr></thead>
+        <tbody id="docTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+<script>
+const API_BASE = (window.location.protocol === "file:" || !window.location.origin || window.location.origin === "null")
+    ? "http://127.0.0.1:8000"
+    : window.location.origin;
+
+const token = localStorage.getItem("access_token");
+if (!token) window.location.href = "login.html";
+
+async function authFetch(path, options = {}) {
+  const headers = { ...(options.headers || {}), Authorization: `Bearer ${token}` };
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || "Request failed");
+  return data;
+}
+
+let allStudents = [];
+
+async function init() {
+  allStudents = await authFetch("/students");
+  const classes = [...new Set(allStudents.map(s => s.class_name))].sort();
+  document.getElementById("classSelect").innerHTML =
+    `<option value="">Select class</option>` + classes.map(c => `<option value="${c}">${c}</option>`).join("");
+}
+
+document.getElementById("classSelect").addEventListener("change", (e) => {
+  const cls = e.target.value;
+  const filtered = allStudents.filter(s => s.class_name === cls);
+  document.getElementById("studentSelect").innerHTML =
+    `<option value="">Select student</option>` +
+    filtered.map(s => `<option value="${s.id}">${s.roll_number} - ${s.name}</option>`).join("");
+  document.getElementById("docTable").innerHTML = "";
+});
+
+document.getElementById("studentSelect").addEventListener("change", loadDocs);
+
+async function loadDocs() {
+  const studentId = document.getElementById("studentSelect").value;
+  if (!studentId) { document.getElementById("docTable").innerHTML = ""; return; }
+  const docs = await authFetch(`/students/${studentId}/documents`);
+  document.getElementById("docTable").innerHTML = docs.map(d => `
+    <tr>
+      <td><span class="doc-tag">${d.doc_type}</span></td>
+      <td>${d.label || "—"}</td>
+      <td>${d.file_name || "—"}</td>
+      <td>${new Date(d.created_at).toLocaleDateString()}</td>
+      <td><button onclick="viewDoc(${studentId}, ${d.id})">View</button></td>
+      <td><button onclick="deleteDoc(${studentId}, ${d.id})" style="background:#dc2626;color:#fff;border:none;">Delete</button></td>
+    </tr>`).join("") || "<tr><td colspan='6'>No documents uploaded yet.</td></tr>";
+}
+
+async function uploadDoc() {
+  const msg = document.getElementById("uploadMsg");
+  msg.textContent = ""; msg.className = "msg";
+  const studentId = document.getElementById("studentSelect").value;
+  if (!studentId) { msg.textContent = "Select a student first."; msg.classList.add("error"); return; }
+
+  const file = document.getElementById("docFile").files[0];
+  if (!file) { msg.textContent = "Choose a file first."; msg.classList.add("error"); return; }
+
+  const docType = document.getElementById("docType").value;
+  const label = document.getElementById("docLabel").value;
+
+  const form = new FormData();
+  form.append("file", file);
+
+  const params = new URLSearchParams({ doc_type: docType });
+  if (label) params.append("label", label);
+
+  try {
+    await authFetch(`/students/${studentId}/documents?${params.toString()}`, {
+      method: "POST",
+      body: form,
+    });
+    msg.textContent = "Uploaded successfully."; msg.classList.add("ok");
+    document.getElementById("docFile").value = "";
+    document.getElementById("docLabel").value = "";
+    await loadDocs();
+  } catch (err) {
+    msg.textContent = err.message; msg.classList.add("error");
+  }
+}
+
+async function viewDoc(studentId, docId) {
+  try {
+    const { url } = await authFetch(`/students/${studentId}/documents/${docId}/url`);
+    window.open(url, "_blank");
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function deleteDoc(studentId, docId) {
+  if (!confirm("Delete this document?")) return;
+  try {
+    await authFetch(`/students/${studentId}/documents/${docId}`, { method: "DELETE" });
+    await loadDocs();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+init();
+</script>
+</body>
+</html>

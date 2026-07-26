@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Teacher Portal Login - SchoolHub</title>
+<link rel="stylesheet" href="css/style.css" />
+<style>
+  body { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #f4f6f9; }
+  .login-box { background: #fff; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); width: 100%; max-width: 380px; }
+  .login-box h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+  .login-box p.sub { color: #666; font-size: 0.9rem; margin-bottom: 1.5rem; }
+  .login-box label { display: block; font-size: 0.85rem; margin: 0.8rem 0 0.3rem; color: #333; }
+  .login-box input { width: 100%; padding: 0.6rem 0.8rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem; }
+  .login-box button { width: 100%; margin-top: 1.5rem; padding: 0.7rem; border: none; border-radius: 6px; background: #2563eb; color: #fff; font-size: 1rem; cursor: pointer; }
+  .login-box button:disabled { opacity: 0.6; cursor: not-allowed; }
+  .error-msg { color: #dc2626; font-size: 0.85rem; margin-top: 0.8rem; display: none; }
+  .back-link { display: block; text-align: center; margin-top: 1.2rem; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+  <div class="login-box">
+    <h1>Teacher Portal</h1>
+    <p class="sub">Sign in with the email &amp; password your school admin gave you.</p>
+    <form id="teacherLoginForm">
+      <label for="email">Email</label>
+      <input type="email" id="email" required autocomplete="username" />
+
+      <label for="password">Password</label>
+      <input type="password" id="password" required autocomplete="current-password" />
+
+      <button type="submit" id="loginBtn">Log In</button>
+      <div class="error-msg" id="errorMsg"></div>
+    </form>
+    <a class="back-link" href="login.html">← School admin login</a>
+  </div>
+
+<script>
+const API_BASE = (window.location.protocol === "file:" || !window.location.origin || window.location.origin === "null")
+    ? "http://127.0.0.1:8000"
+    : window.location.origin;
+
+const form = document.getElementById("teacherLoginForm");
+const errorMsg = document.getElementById("errorMsg");
+const loginBtn = document.getElementById("loginBtn");
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  errorMsg.style.display = "none";
+  loginBtn.disabled = true;
+  loginBtn.textContent = "Logging in...";
+
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+
+  try {
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Login failed");
+
+    if (data.role !== "teacher") {
+      throw new Error("This login is not registered as a teacher account.");
+    }
+
+    localStorage.setItem("teacher_token", data.access_token);
+    localStorage.setItem("teacher_name", data.full_name || "");
+    window.location.href = "teacher-dashboard.html";
+  } catch (err) {
+    errorMsg.textContent = err.message;
+    errorMsg.style.display = "block";
+  } finally {
+    loginBtn.disabled = false;
+    loginBtn.textContent = "Log In";
+  }
+});
+</script>
+</body>
+</html>

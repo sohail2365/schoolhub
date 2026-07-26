@@ -5,30 +5,34 @@ Demo Data Seeder for SchoolHub
 Fills a school account with realistic demo data for client demos:
 - 55 students across classes 1-5 (realistic Pakistani names, father names, phones)
 - Monthly tuition fees for every student (mix of paid / partial / pending)
-- Attendance for the last 20 school days (~90% attendance, realistic absences)
+- Attendance for the last N school days (~90% attendance, realistic absences)
 - Grades in 4 subjects per student (Math, English, Urdu, Science)
 
-It seeds through the normal REST API (not direct DB access), so it works
-against BOTH a local server and the deployed Vercel app.
+Built to survive slow/flaky connections (Vercel serverless cold starts,
+Supabase latency): automatic retries with backoff, parallel workers, and
+one failed request never crashes the whole run.
 
 USAGE:
     python demo_data/seed_demo_data.py --url https://schoolhub-ivory.vercel.app --email YOUR_LOGIN_EMAIL --password YOUR_PASSWORD
 
-    (or for local testing:)
-    python demo_data/seed_demo_data.py --url http://127.0.0.1:8000 --email ... --password ...
+Optional flags:
+    --days 12       attendance days to seed (default 12; more days = longer runtime)
+    --workers 8     parallel request workers (default 8)
 
 TIP: Register a fresh school account first (e.g. "Demo Model School") and
 seed THAT — keep demo data separate from any real school's account.
 
-NOTE: Running twice will skip students that already exist (duplicate roll
-numbers are rejected by the API), so it's safe to re-run.
+Safe to re-run: existing students (same class+roll) are skipped.
 """
 import argparse
 import random
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, timedelta
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 random.seed(42)  # same data every run — predictable for demos
 
@@ -51,6 +55,37 @@ MONTHLY_FEE = {"1": 1500, "2": 1500, "3": 1800, "4": 2000, "5": 2000}
 
 def log(msg):
     print(msg, flush=True)
+
+
+def make_session():
+    """Session with automatic retries + backoff for flaky/slow connections."""
+    session = requests.Session()
+    retry = Retry(
+        total=4,
+        backoff_factor=2,          # waits 2s, 4s, 8s, 16s between retries
+        status_forcelist=[500, 502, 503, 504],
+        allowed_methods=["GET", "POST"],
+    )
+    adapter = HTTPAdapter(max_retries=retry, pool_connections=20, pool_maxsize=20)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
+
+
+def safe_post(session, url, json_body, headers, timeout=60):
+    """POST that never raises — returns (status_code, json_or_None)."""
+    for attempt in range(3):
+        try:
+            r = session.post(url, json=json_body, headers=headers, timeout=timeout)
+            try:
+                return r.status_code, r.json()
+            except ValueError:
+                return r.status_code, None
+        except requests.RequestException:
+            if attempt < 2:
+                continue
+            return 0, None  # network-level failure after all retries
+    return 0, None
 
 
 def make_students():
@@ -90,103 +125,159 @@ def school_days_back(n):
     return list(reversed(days))
 
 
+def run_parallel(tasks, workers, label):
+    """tasks: list of zero-arg callables returning True/False. Shows progress."""
+    done_ok = 0
+    done_fail = 0
+    total = len(tasks)
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(t) for t in tasks]
+        for i, fut in enumerate(as_completed(futures), 1):
+            if fut.result():
+                done_ok += 1
+            else:
+                done_fail += 1
+            if i % 50 == 0 or i == total:
+                log(f"   {label}: {i}/{total} done ({done_fail} failed)")
+    return done_ok, done_fail
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", required=True, help="e.g. https://schoolhub-ivory.vercel.app")
     parser.add_argument("--email", required=True)
     parser.add_argument("--password", required=True)
+    parser.add_argument("--days", type=int, default=12, help="attendance days to seed (default 12)")
+    parser.add_argument("--workers", type=int, default=8, help="parallel workers (default 8)")
     args = parser.parse_args()
     base = args.url.rstrip("/")
 
-    # Login
-    r = requests.post(f"{base}/auth/login", json={"email": args.email, "password": args.password}, timeout=30)
-    if r.status_code != 200:
-        log(f"❌ Login failed ({r.status_code}): {r.text[:200]}")
+    session = make_session()
+
+    # Login (with generous timeout for serverless cold start)
+    log("🔑 Logging in (first request may be slow — server waking up)...")
+    status, data = safe_post(session, f"{base}/auth/login",
+                             {"email": args.email, "password": args.password}, {}, timeout=90)
+    if status != 200 or not data:
+        log(f"❌ Login failed (status {status}). Check URL/email/password and try again.")
         sys.exit(1)
-    headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    headers = {"Authorization": f"Bearer {data['access_token']}"}
     log(f"✅ Logged in as {args.email}")
 
-    # ---- Students ----
+    # ---- Students (sequential — order matters for sibling phone sharing; only 55) ----
+    log("👨‍🎓 Creating students...")
     created_students = []
     skipped = 0
+    failed = 0
     for s in make_students():
-        r = requests.post(f"{base}/students", json=s, headers=headers, timeout=30)
-        if r.status_code == 201:
-            created_students.append(r.json())
-        elif r.status_code == 409:
+        status, resp = safe_post(session, f"{base}/students", s, headers)
+        if status == 201 and resp:
+            created_students.append(resp)
+        elif status == 409:
             skipped += 1
         else:
-            log(f"⚠️  Student '{s['name']}' failed ({r.status_code}): {r.text[:150]}")
-    log(f"✅ Students: {len(created_students)} created, {skipped} skipped (already existed)")
+            failed += 1
+    log(f"✅ Students: {len(created_students)} created, {skipped} skipped (already existed), {failed} failed")
+
+    # Always work from the FULL student list (covers partial previous runs where
+    # some students were created earlier and would otherwise miss fees/grades).
+    try:
+        r = session.get(f"{base}/students", headers=headers, timeout=60)
+        all_students = r.json() if r.status_code == 200 else created_students
+    except requests.RequestException:
+        all_students = created_students
+    created_students = all_students
 
     if not created_students:
-        # Re-fetch existing students so fees/attendance/grades can still be seeded on re-runs
-        r = requests.get(f"{base}/students", headers=headers, timeout=30)
-        created_students = r.json() if r.status_code == 200 else []
-        log(f"ℹ️  Using {len(created_students)} existing students for remaining data")
+        log("❌ No students available — cannot seed fees/attendance/grades. Re-run the script.")
+        sys.exit(1)
 
-    # ---- Fees (current month tuition per student, mixed statuses) ----
+    # Fetch existing fees/grades so re-runs don't create duplicates.
     month_name = date.today().strftime("%B")
-    fees_created = 0
-    payments_made = 0
-    for s in created_students:
+    students_with_fee = set()
+    try:
+        r = session.get(f"{base}/fees", headers=headers, timeout=60)
+        if r.status_code == 200:
+            for f in r.json():
+                if f.get("fee_name") == "Tuition Fee" and f.get("month") == month_name:
+                    students_with_fee.add(f["student_id"])
+    except requests.RequestException:
+        pass
+
+    students_with_grades = set()
+    try:
+        r = session.get(f"{base}/grades", headers=headers, timeout=60)
+        if r.status_code == 200:
+            for g in r.json():
+                students_with_grades.add(g["student_id"])
+    except requests.RequestException:
+        pass
+
+    # ---- Fees (parallel) ----
+    log("💰 Creating fees + payments...")
+    fee_targets = [s for s in created_students if s["id"] not in students_with_fee]
+    if len(fee_targets) < len(created_students):
+        log(f"   (skipping {len(created_students) - len(fee_targets)} students who already have this month's fee)")
+
+    def fee_task(s):
         amount = MONTHLY_FEE.get(s["class_name"], 1500)
-        r = requests.post(f"{base}/fees", json={
+        status, fee = safe_post(session, f"{base}/fees", {
             "student_id": s["id"], "fee_name": "Tuition Fee", "amount": amount,
-            "month": month_name,
-            "due_date": date.today().replace(day=10).isoformat(),
-        }, headers=headers, timeout=30)
-        if r.status_code != 201:
-            continue
-        fees_created += 1
-        fee = r.json()
-
+            "month": month_name, "due_date": date.today().replace(day=10).isoformat(),
+        }, headers)
+        if status != 201 or not fee:
+            return False
         roll = random.random()
-        if roll < 0.55:        # 55% fully paid
-            pay = amount
-        elif roll < 0.75:      # 20% partially paid
-            pay = round(amount * random.choice([0.25, 0.5, 0.75]))
-        else:                  # 25% unpaid
-            pay = 0
-
+        pay = amount if roll < 0.55 else (round(amount * random.choice([0.25, 0.5, 0.75])) if roll < 0.75 else 0)
         if pay > 0:
-            pr = requests.post(f"{base}/fees/{fee['id']}/payment", json={
-                "fee_id": fee["id"], "amount_paid": pay, "payment_method": "cash",
-            }, headers=headers, timeout=30)
-            if pr.status_code == 201:
-                payments_made += 1
-    log(f"✅ Fees: {fees_created} created, {payments_made} payments recorded (mix of paid/partial/pending)")
+            safe_post(session, f"{base}/fees/{fee['id']}/payment",
+                      {"fee_id": fee["id"], "amount_paid": pay, "payment_method": "cash"}, headers)
+        return True
 
-    # ---- Attendance (last 20 school days, ~90% present) ----
-    days = school_days_back(20)
-    attendance_created = 0
-    for s in created_students:
-        for d in days:
-            is_present = random.random() < 0.9
-            r = requests.post(f"{base}/attendance", json={
-                "student_id": s["id"], "date": d.isoformat(), "is_present": is_present,
-                "remarks": None if is_present else random.choice([None, "Sick", "Family emergency", None]),
-            }, headers=headers, timeout=30)
-            if r.status_code == 201:
-                attendance_created += 1
-    log(f"✅ Attendance: {attendance_created} records across {len(days)} school days")
+    ok, fail = run_parallel([lambda s=s: fee_task(s) for s in fee_targets], args.workers, "fees")
+    log(f"✅ Fees: {ok} created ({fail} failed)")
 
-    # ---- Grades (4 subjects each, realistic spread) ----
-    grades_created = 0
-    for s in created_students:
-        ability = random.uniform(0.45, 0.95)  # each student has a consistent ability level
+    # ---- Attendance (parallel — the big one) ----
+    days = school_days_back(args.days)
+    log(f"📅 Creating attendance for {len(days)} school days x {len(created_students)} students = {len(days)*len(created_students)} records...")
+
+    def attendance_task(sid, d):
+        is_present = random.random() < 0.9
+        status, _ = safe_post(session, f"{base}/attendance", {
+            "student_id": sid, "date": d.isoformat(), "is_present": is_present,
+            "remarks": None if is_present else random.choice([None, "Sick", "Family emergency", None]),
+        }, headers)
+        return status in (201, 409)  # 409 = already marked (re-run), counts as fine
+
+    att_tasks = [lambda sid=s["id"], d=d: attendance_task(sid, d) for s in created_students for d in days]
+    ok, fail = run_parallel(att_tasks, args.workers, "attendance")
+    log(f"✅ Attendance: {ok} records ({fail} failed)")
+
+    # ---- Grades (parallel) ----
+    log("📊 Creating grades...")
+    grade_targets = [s for s in created_students if s["id"] not in students_with_grades]
+    if len(grade_targets) < len(created_students):
+        log(f"   (skipping {len(created_students) - len(grade_targets)} students who already have grades)")
+
+    def grade_task(sid, subject, ability):
+        marks = round(min(100, max(20, random.gauss(ability * 100, 8))))
+        status, _ = safe_post(session, f"{base}/grades", {
+            "student_id": sid, "subject": subject,
+            "marks_obtained": marks, "total_marks": 100,
+            "exam_date": (date.today() - timedelta(days=random.randint(5, 25))).isoformat(),
+        }, headers)
+        return status == 201
+
+    grade_tasks = []
+    for s in grade_targets:
+        ability = random.uniform(0.45, 0.95)
         for subject in SUBJECTS:
-            marks = round(min(100, max(20, random.gauss(ability * 100, 8))))
-            r = requests.post(f"{base}/grades", json={
-                "student_id": s["id"], "subject": subject,
-                "marks_obtained": marks, "total_marks": 100,
-                "exam_date": (date.today() - timedelta(days=random.randint(5, 25))).isoformat(),
-            }, headers=headers, timeout=30)
-            if r.status_code == 201:
-                grades_created += 1
-    log(f"✅ Grades: {grades_created} records ({len(SUBJECTS)} subjects per student)")
+            grade_tasks.append(lambda sid=s["id"], sub=subject, ab=ability: grade_task(sid, sub, ab))
+    ok, fail = run_parallel(grade_tasks, args.workers, "grades")
+    log(f"✅ Grades: {ok} records ({fail} failed)")
 
     log("\n🎉 Demo data seeding complete! Open the dashboard and refresh.")
+    log("   (Agar kuch records fail hue hon, script dobara chala dein — duplicates skip ho jayenge.)")
 
 
 if __name__ == "__main__":

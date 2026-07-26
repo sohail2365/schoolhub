@@ -46,6 +46,12 @@ class Student(Base):
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     address: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Profile/ID-card photo shown on the printable student card. This is
+    # separate from StudentDocument (which holds the full B-form/ID-card/test
+    # paper archive) because the card print view needs one canonical photo
+    # without querying the documents table every time.
+    photo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False

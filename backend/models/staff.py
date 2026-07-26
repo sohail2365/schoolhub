@@ -29,6 +29,16 @@ class Staff(Base):
         index=True,
     )
 
+    # Links this staff record to a portal login (users table). Nullable
+    # because most staff (e.g. support staff) never need a login — only set
+    # when the admin explicitly creates portal access for a teacher via
+    # POST /staff/{staff_id}/create-login.
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        unique=True,
+    )
+
     name: Mapped[str] = mapped_column(String(150), nullable=False, index=True)
     designation: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     role: Mapped[StaffRole] = mapped_column(

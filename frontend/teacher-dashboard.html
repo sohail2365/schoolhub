@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Teacher Portal - SchoolHub</title>
+<link rel="stylesheet" href="css/style.css" />
+<style>
+  body { background: #f4f6f9; margin: 0; }
+  .topbar { background: #1e293b; color: #fff; padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; }
+  .topbar h1 { font-size: 1.15rem; margin: 0; }
+  .topbar button { background: transparent; border: 1px solid #64748b; color: #fff; padding: 0.4rem 0.9rem; border-radius: 6px; cursor: pointer; }
+  .container { max-width: 960px; margin: 1.5rem auto; padding: 0 1rem; }
+  .card { background: #fff; border-radius: 10px; padding: 1.2rem 1.4rem; margin-bottom: 1.2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+  .card h2 { font-size: 1.05rem; margin: 0 0 0.9rem; }
+  .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+  .tab-btn { padding: 0.5rem 1rem; border: 1px solid #ddd; background: #fff; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
+  .tab-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid #eee; }
+  select, input { padding: 0.4rem 0.6rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9rem; }
+  .row-form { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
+  .row-form button { padding: 0.45rem 1rem; border: none; border-radius: 6px; background: #16a34a; color: #fff; cursor: pointer; }
+  .msg { font-size: 0.85rem; margin-top: 0.5rem; }
+  .msg.error { color: #dc2626; } .msg.ok { color: #16a34a; }
+  .pill { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.78rem; }
+  .pill.present { background: #dcfce7; color: #166534; }
+  .pill.absent { background: #fee2e2; color: #991b1b; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <h1 id="headerTitle">Teacher Portal</h1>
+    <button onclick="logout()">Log out</button>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <h2 id="classInfo">Loading your class…</h2>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="attendance">Attendance</button>
+      <button class="tab-btn" data-tab="grades">Grades</button>
+      <button class="tab-btn" data-tab="testrecords">Monthly/Annual Test Records</button>
+    </div>
+
+    <!-- ATTENDANCE -->
+    <div class="card" id="tab-attendance">
+      <h2>Mark Today's Attendance</h2>
+      <div class="row-form">
+        <input type="date" id="attDate" />
+        <select id="attStudent"></select>
+        <select id="attPresent">
+          <option value="true">Present</option>
+          <option value="false">Absent</option>
+        </select>
+        <input type="text" id="attRemarks" placeholder="Remarks (optional)" />
+        <button onclick="markAttendance()">Save</button>
+      </div>
+      <div class="msg" id="attMsg"></div>
+      <table>
+        <thead><tr><th>Date</th><th>Student</th><th>Status</th><th>Remarks</th></tr></thead>
+        <tbody id="attTable"></tbody>
+      </table>
+    </div>
+
+    <!-- GRADES -->
+    <div class="card" id="tab-grades" style="display:none">
+      <h2>Enter Grade</h2>
+      <div class="row-form">
+        <select id="gradeStudent"></select>
+        <input type="text" id="gradeSubject" placeholder="Subject" style="width:140px" />
+        <input type="number" id="gradeMarks" placeholder="Marks" style="width:90px" />
+        <input type="number" id="gradeTotal" placeholder="Total" value="100" style="width:90px" />
+        <input type="date" id="gradeExamDate" />
+        <button onclick="addGrade()">Save</button>
+      </div>
+      <div class="msg" id="gradeMsg"></div>
+      <table>
+        <thead><tr><th>Student</th><th>Subject</th><th>Marks</th><th>%</th><th>Exam Date</th></tr></thead>
+        <tbody id="gradeTable"></tbody>
+      </table>
+    </div>
+
+    <!-- TEST RECORDS -->
+    <div class="card" id="tab-testrecords" style="display:none">
+      <h2>Add Monthly/Annual Test Record (with photo of paper)</h2>
+      <div class="row-form">
+        <select id="trStudent"></select>
+        <select id="trTerm">
+          <option value="monthly">Monthly</option>
+          <option value="annual">Annual</option>
+        </select>
+        <input type="text" id="trPeriod" placeholder="Period (YYYY-MM or YYYY)" style="width:140px" />
+        <input type="text" id="trSubject" placeholder="Subject" style="width:120px" />
+        <input type="number" id="trMarks" placeholder="Marks" style="width:80px" />
+        <input type="number" id="trTotal" placeholder="Total" value="100" style="width:80px" />
+        <input type="file" id="trImage" accept="image/*,application/pdf" />
+        <button onclick="addTestRecord()">Save</button>
+      </div>
+      <div class="msg" id="trMsg"></div>
+      <table>
+        <thead><tr><th>Student</th><th>Term</th><th>Period</th><th>Subject</th><th>Marks</th><th>Photo</th></tr></thead>
+        <tbody id="trTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+<script>
+const API_BASE = (window.location.protocol === "file:" || !window.location.origin || window.location.origin === "null")
+    ? "http://127.0.0.1:8000"
+    : window.location.origin;
+
+const token = localStorage.getItem("teacher_token");
+if (!token) window.location.href = "teacher-login.html";
+
+let myStudents = [];
+
+function logout() {
+  localStorage.removeItem("teacher_token");
+  localStorage.removeItem("teacher_name");
+  window.location.href = "teacher-login.html";
+}
+
+async function authFetch(path, options = {}) {
+  const headers = { ...(options.headers || {}), Authorization: `Bearer ${token}` };
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    if (res.status === 401) { logout(); }
+    throw new Error(data.detail || "Request failed");
+  }
+  return data;
+}
+
+function populateStudentSelects() {
+  const opts = myStudents.map(s => `<option value="${s.id}">${s.roll_number} - ${s.name}</option>`).join("");
+  ["attStudent", "gradeStudent", "trStudent"].forEach(id => {
+    document.getElementById(id).innerHTML = opts;
+  });
+}
+
+async function loadMyClass() {
+  const me = await authFetch("/teacher/me");
+  document.getElementById("headerTitle").textContent = `Teacher Portal — ${me.name}`;
+  document.getElementById("classInfo").textContent =
+    `Class: ${me.class_assigned}${me.subject ? " · Subject: " + me.subject : ""}`;
+
+  myStudents = await authFetch("/teacher/students");
+  populateStudentSelects();
+
+  await loadAttendance();
+  await loadGrades();
+  await loadTestRecords();
+}
+
+document.getElementById("attDate").valueAsDate = new Date();
+
+async function markAttendance() {
+  const msg = document.getElementById("attMsg");
+  msg.textContent = ""; msg.className = "msg";
+  try {
+    const body = new URLSearchParams();
+    body.append("student_id", document.getElementById("attStudent").value);
+    body.append("date", document.getElementById("attDate").value);
+    body.append("is_present", document.getElementById("attPresent").value);
+    const remarks = document.getElementById("attRemarks").value;
+    if (remarks) body.append("remarks", remarks);
+
+    await authFetch("/teacher/attendance", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    });
+    msg.textContent = "Attendance saved."; msg.classList.add("ok");
+    document.getElementById("attRemarks").value = "";
+    await loadAttendance();
+  } catch (err) {
+    msg.textContent = err.message; msg.classList.add("error");
+  }
+}
+
+async function loadAttendance() {
+  const records = await authFetch("/teacher/attendance");
+  const byId = Object.fromEntries(myStudents.map(s => [s.id, s.name]));
+  document.getElementById("attTable").innerHTML = records.slice(0, 30).map(r => `
+    <tr>
+      <td>${r.date}</td>
+      <td>${byId[r.student_id] || r.student_id}</td>
+      <td><span class="pill ${r.is_present ? "present" : "absent"}">${r.is_present ? "Present" : "Absent"}</span></td>
+      <td>${r.remarks || ""}</td>
+    </tr>`).join("");
+}
+
+async function addGrade() {
+  const msg = document.getElementById("gradeMsg");
+  msg.textContent = ""; msg.className = "msg";
+  try {
+    const body = new URLSearchParams();
+    body.append("student_id", document.getElementById("gradeStudent").value);
+    body.append("subject", document.getElementById("gradeSubject").value);
+    body.append("marks_obtained", document.getElementById("gradeMarks").value);
+    body.append("total_marks", document.getElementById("gradeTotal").value || "100");
+    const examDate = document.getElementById("gradeExamDate").value;
+    if (examDate) body.append("exam_date", examDate);
+
+    await authFetch("/teacher/grades", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    });
+    msg.textContent = "Grade saved."; msg.classList.add("ok");
+    document.getElementById("gradeSubject").value = "";
+    document.getElementById("gradeMarks").value = "";
+    await loadGrades();
+  } catch (err) {
+    msg.textContent = err.message; msg.classList.add("error");
+  }
+}
+
+async function loadGrades() {
+  const records = await authFetch("/teacher/grades");
+  const byId = Object.fromEntries(myStudents.map(s => [s.id, s.name]));
+  document.getElementById("gradeTable").innerHTML = records.slice(0, 30).map(r => `
+    <tr>
+      <td>${byId[r.student_id] || r.student_id}</td>
+      <td>${r.subject}</td>
+      <td>${r.marks_obtained}/${r.total_marks}</td>
+      <td>${r.percentage}%</td>
+      <td>${r.exam_date || "—"}</td>
+    </tr>`).join("");
+}
+
+async function addTestRecord() {
+  const msg = document.getElementById("trMsg");
+  msg.textContent = ""; msg.className = "msg";
+  try {
+    const form = new FormData();
+    form.append("student_id", document.getElementById("trStudent").value);
+    form.append("term_type", document.getElementById("trTerm").value);
+    form.append("period", document.getElementById("trPeriod").value);
+    form.append("subject", document.getElementById("trSubject").value);
+    form.append("marks_obtained", document.getElementById("trMarks").value);
+    form.append("total_marks", document.getElementById("trTotal").value || "100");
+    const imageFile = document.getElementById("trImage").files[0];
+    if (imageFile) form.append("image", imageFile);
+
+    await authFetch("/teacher/test-records", { method: "POST", body: form });
+    msg.textContent = "Test record saved."; msg.classList.add("ok");
+    document.getElementById("trPeriod").value = "";
+    document.getElementById("trSubject").value = "";
+    document.getElementById("trMarks").value = "";
+    document.getElementById("trImage").value = "";
+    await loadTestRecords();
+  } catch (err) {
+    msg.textContent = err.message; msg.classList.add("error");
+  }
+}
+
+async function loadTestRecords() {
+  const records = await authFetch("/teacher/test-records");
+  const byId = Object.fromEntries(myStudents.map(s => [s.id, s.name]));
+  document.getElementById("trTable").innerHTML = records.slice(0, 30).map(r => `
+    <tr>
+      <td>${byId[r.student_id] || r.student_id}</td>
+      <td>${r.term_type}</td>
+      <td>${r.period}</td>
+      <td>${r.subject}</td>
+      <td>${r.marks_obtained}/${r.total_marks}</td>
+      <td>${r.image_url ? `<button onclick="viewRecordImage(${r.id})">View</button>` : "—"}</td>
+    </tr>`).join("");
+}
+
+async function viewRecordImage(recordId) {
+  try {
+    const { url } = await authFetch(`/test-records/${recordId}/image-url`);
+    window.open(url, "_blank");
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    ["attendance", "grades", "testrecords"].forEach(t => {
+      document.getElementById(`tab-${t}`).style.display = (t === btn.dataset.tab) ? "block" : "none";
+    });
+  });
+});
+
+loadMyClass().catch(err => {
+  document.getElementById("classInfo").textContent = err.message;
+});
+</script>
+</body>
+</html>
