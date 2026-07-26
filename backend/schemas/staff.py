@@ -32,6 +32,7 @@ class StaffUpdate(BaseModel):
 class StaffOut(BaseModel):
     id: int
     school_id: int
+    user_id: int | None = None
     name: str
     designation: str
     role: str

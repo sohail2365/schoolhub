@@ -105,6 +105,7 @@ class StudentOut(StudentBase):
     id: int
     school_id: int
     user_id: Optional[int] = None
+    photo_url: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

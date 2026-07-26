@@ -66,6 +66,16 @@ app.add_middleware(
 )
 
 @app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    # Baseline hardening headers — cheap, safe, and standard practice.
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+    return response
+
+@app.middleware("http")
 async def error_handling_middleware(request: Request, call_next):
     try:
         response = await call_next(request)
@@ -102,6 +112,19 @@ async def startup():
         _ensure_column("schools", "is_active", "is_active BOOLEAN NOT NULL DEFAULT TRUE")
         _ensure_column("students", "photo_url", "photo_url VARCHAR(500)")
         _ensure_column("staff", "user_id", "user_id INTEGER")
+        _ensure_column("users", "failed_login_attempts", "failed_login_attempts INTEGER NOT NULL DEFAULT 0")
+        _ensure_column("users", "locked_until", "locked_until DATETIME")
+
+        # ⚠️ SECURITY: these two secrets, if left at their placeholder default,
+        # let anyone forge admin tokens or access the super-admin panel for
+        # EVERY school on this deployment. Loud warning instead of silently
+        # continuing — fix by setting real random values in Vercel's env vars.
+        if settings.JWT_SECRET == "replace_with_a_strong_random_secret":
+            print("🚨🚨🚨 SECURITY WARNING: JWT_SECRET is still the default placeholder! "
+                  "Anyone can forge login tokens. Set a real random JWT_SECRET immediately.")
+        if not settings.SUPER_ADMIN_SECRET:
+            print("⚠️  SUPER_ADMIN_SECRET is not set — the super-admin panel route is unreachable "
+                  "(fails closed), which is safe, but set it if you actually use that panel.")
 
         # Initialize all tables
         init_db()

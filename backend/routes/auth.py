@@ -63,8 +63,28 @@ def register_school(payload: SchoolRegisterRequest, db: Session = Depends(get_db
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.email).first()
 
+    # Same generic error for "no such user" and "locked out" — don't leak
+    # which emails exist or that a lockout specifically is in effect.
+    if user and user.locked_until and user.locked_until > datetime.utcnow():
+        raise HTTPException(
+            status_code=403,
+            detail="Too many failed attempts. Try again in a few minutes.",
+        )
+
     if not user or not verify_password(payload.password, user.password_hash):
+        if user:
+            user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+            if user.failed_login_attempts >= 5:
+                user.locked_until = datetime.utcnow() + timedelta(minutes=15)
+                user.failed_login_attempts = 0
+            db.commit()
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # Successful login — clear any prior failed-attempt tracking.
+    if user.failed_login_attempts or user.locked_until:
+        user.failed_login_attempts = 0
+        user.locked_until = None
+        db.commit()
 
     if not user.is_active:
         raise HTTPException(status_code=403, detail="User account is inactive")

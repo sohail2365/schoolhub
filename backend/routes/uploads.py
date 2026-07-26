@@ -32,6 +32,19 @@ def _parse_doc_type(value: str) -> DocumentType:
         )
 
 
+@router.get("/{student_id}/photo-url")
+def get_student_photo_url(
+    student_id: int,
+    token: dict = Depends(require_roles(["admin", "teacher", "parent"])),
+    db: Session = Depends(get_db),
+):
+    """Signed URL for the student's card/profile photo (Student.photo_url), used on the printable ID card."""
+    student = _get_student_or_404(db, student_id, token["school_id"])
+    if not student.photo_url:
+        raise HTTPException(status_code=404, detail="No photo uploaded for this student yet")
+    return {"url": get_signed_url(student.photo_url), "expires_in_seconds": 3600}
+
+
 # ==================== STUDENT DOCUMENTS (ID card, B-form, test papers, etc.) ====================
 
 @router.post(
