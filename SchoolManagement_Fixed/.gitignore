@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+school.db
+school.db.bak
+backups/
+logs/*.log
+.venv/
+*.egg-info/
+.vercel/
