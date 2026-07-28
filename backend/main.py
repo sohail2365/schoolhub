@@ -134,7 +134,7 @@ async def startup():
         })
         _ensure_columns(inspector, existing_tables, "users", {
             "failed_login_attempts": "failed_login_attempts INTEGER NOT NULL DEFAULT 0",
-            "locked_until": "locked_until DATETIME",
+            "locked_until": "locked_until TIMESTAMP",
         })
 
         # ⚠️ SECURITY: these two secrets, if left at their placeholder default,
