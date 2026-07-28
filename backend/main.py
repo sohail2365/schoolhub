@@ -25,20 +25,30 @@ from backend.routes.teacher import router as teacher_router
 # columns to a table that already exists in school.db. So when a model gains
 # a field (e.g. Staff.role), existing databases break with
 # "table X has no column named Y" until the column is added manually.
-# This helper adds any missing column WITHOUT touching existing rows/data.
-def _ensure_column(table_name: str, column_name: str, column_ddl: str):
+# This helper adds any missing columns WITHOUT touching existing rows/data.
+#
+# IMPORTANT (cold-start latency): this runs on EVERY serverless cold start,
+# and each DB round-trip costs real time against a free-tier Supabase
+# Postgres instance. Checking columns ONE AT A TIME (7 separate
+# inspector.get_columns() calls) was adding up to 7 extra round-trips before
+# any request could be served — batched here to ONE get_columns() call per
+# TABLE (4 calls total) instead of per COLUMN, since several columns landed
+# on the same table (schools, staff, users).
+def _ensure_columns(inspector, existing_tables: set[str], table_name: str, columns: dict[str, str]):
+    if table_name not in existing_tables:
+        return  # table doesn't exist yet — create_all() will create it fully
     try:
-        inspector = inspect(engine)
-        if table_name not in inspector.get_table_names():
-            return  # table doesn't exist yet — create_all() will create it fully
-        existing_columns = [col["name"] for col in inspector.get_columns(table_name)]
-        if column_name not in existing_columns:
-            with engine.connect() as conn:
+        existing_columns = {col["name"] for col in inspector.get_columns(table_name)}
+        missing = {name: ddl for name, ddl in columns.items() if name not in existing_columns}
+        if not missing:
+            return
+        with engine.connect() as conn:
+            for column_name, column_ddl in missing.items():
                 conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_ddl}"))
-                conn.commit()
-            print(f"✅ Migrated: added missing column '{column_name}' to '{table_name}'")
+                print(f"✅ Migrated: added missing column '{column_name}' to '{table_name}'")
+            conn.commit()
     except Exception as e:
-        print(f"⚠️ Migration check failed for {table_name}.{column_name}: {e}")
+        print(f"⚠️ Migration check failed for table '{table_name}': {e}")
 
 app = FastAPI(
     title="School Management System",
@@ -106,14 +116,26 @@ async def startup():
         print("🚀 INITIALIZING DATABASE...")
         print("="*60)
 
-        # Heal any existing database that was created before these columns existed
-        _ensure_column("schools", "city", "city VARCHAR(50)")
-        _ensure_column("staff", "role", "role VARCHAR(20) NOT NULL DEFAULT 'teacher'")
-        _ensure_column("schools", "is_active", "is_active BOOLEAN NOT NULL DEFAULT TRUE")
-        _ensure_column("students", "photo_url", "photo_url VARCHAR(500)")
-        _ensure_column("staff", "user_id", "user_id INTEGER")
-        _ensure_column("users", "failed_login_attempts", "failed_login_attempts INTEGER NOT NULL DEFAULT 0")
-        _ensure_column("users", "locked_until", "locked_until DATETIME")
+        # Heal any existing database that was created before these columns existed.
+        # One inspector + one get_table_names() call, reused across all tables.
+        inspector = inspect(engine)
+        existing_tables = set(inspector.get_table_names())
+
+        _ensure_columns(inspector, existing_tables, "schools", {
+            "city": "city VARCHAR(50)",
+            "is_active": "is_active BOOLEAN NOT NULL DEFAULT TRUE",
+        })
+        _ensure_columns(inspector, existing_tables, "staff", {
+            "role": "role VARCHAR(20) NOT NULL DEFAULT 'teacher'",
+            "user_id": "user_id INTEGER",
+        })
+        _ensure_columns(inspector, existing_tables, "students", {
+            "photo_url": "photo_url VARCHAR(500)",
+        })
+        _ensure_columns(inspector, existing_tables, "users", {
+            "failed_login_attempts": "failed_login_attempts INTEGER NOT NULL DEFAULT 0",
+            "locked_until": "locked_until DATETIME",
+        })
 
         # ⚠️ SECURITY: these two secrets, if left at their placeholder default,
         # let anyone forge admin tokens or access the super-admin panel for
