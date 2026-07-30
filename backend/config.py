@@ -57,6 +57,14 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_KEY: str = ""
     SUPABASE_BUCKET: str = "student-files"
 
+    # Error monitoring via Sentry (sentry.io, free tier). Optional — if not
+    # set, Sentry stays disabled and nothing changes. Set SENTRY_DSN in
+    # Vercel env vars (both Production and Preview) to enable.
+    # SENTRY_ENVIRONMENT distinguishes production errors from staging ones
+    # in the Sentry dashboard — set it to "production" / "staging" per env.
+    SENTRY_DSN: str = ""
+    SENTRY_ENVIRONMENT: str = "production"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

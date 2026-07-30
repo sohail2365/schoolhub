@@ -20,6 +20,27 @@ from backend.routes.uploads import router as uploads_router
 from backend.routes.test_records import router as test_records_router
 from backend.routes.teacher import router as teacher_router
 
+# ✅ ERROR MONITORING (Sentry) — initialized before the app is created so it
+# captures everything, including startup failures. Fully optional: without
+# SENTRY_DSN set, this block is a no-op and the app behaves exactly as before.
+if settings.SENTRY_DSN:
+    try:
+        import sentry_sdk
+
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            environment=settings.SENTRY_ENVIRONMENT,
+            # Only error events — no performance tracing, keeps free-tier
+            # quota for what matters (errors) and adds no request overhead.
+            traces_sample_rate=0.0,
+            # Don't attach request bodies/local variables — school data
+            # (student names, fees) must not end up in a third-party tool.
+            send_default_pii=False,
+        )
+        print(f"✅ Sentry error monitoring enabled ({settings.SENTRY_ENVIRONMENT})")
+    except Exception as _sentry_err:  # monitoring must never break the app
+        print(f"⚠️ Sentry init failed (continuing without it): {_sentry_err}")
+
 # ✅ NON-DESTRUCTIVE AUTO-MIGRATION
 # Base.metadata.create_all() only creates NEW tables — it never adds new
 # columns to a table that already exists in school.db. So when a model gains
@@ -93,6 +114,15 @@ async def error_handling_middleware(request: Request, call_next):
     except Exception as e:
         print(f"❌ Error: {str(e)}")
         print(traceback.format_exc())
+        # This middleware swallows the exception (returns a JSON 500 instead
+        # of re-raising), so Sentry's automatic integration never sees it —
+        # capture it explicitly here.
+        if settings.SENTRY_DSN:
+            try:
+                import sentry_sdk
+                sentry_sdk.capture_exception(e)
+            except Exception:
+                pass  # monitoring must never break the response
         response = JSONResponse(
             status_code=500,
             content={"detail": f"Internal server error: {str(e)}"}

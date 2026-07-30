@@ -149,4 +149,3 @@ schoolhub/
 ## 📄 License
 
 Private project — all rights reserved unless otherwise stated by the project owner.
- 
