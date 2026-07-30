@@ -121,6 +121,11 @@ async def error_handling_middleware(request: Request, call_next):
             try:
                 import sentry_sdk
                 sentry_sdk.capture_exception(e)
+                # CRITICAL on Vercel: the function freezes as soon as the
+                # response is returned, so Sentry's background sender never
+                # runs. flush() blocks (max 3s) until the event is actually
+                # delivered — without this, no error ever reaches Sentry.
+                sentry_sdk.flush(timeout=3)
             except Exception:
                 pass  # monitoring must never break the response
         response = JSONResponse(
