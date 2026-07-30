@@ -5,15 +5,86 @@ from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.models.attendance import Attendance
-from backend.models.fee import Fee
+from backend.models.fee import Fee, FeeStatus
 from backend.models.grade import Grade
 from backend.models.payment import Payment
+from backend.models.school import School
 from backend.models.student import Student
 from backend.schemas.student import StudentCreate, StudentOut, StudentUpdate
 from backend.utils.jwt_handler import verify_token
 from backend.utils.rbac import require_roles
 
 router = APIRouter(prefix="/students", tags=["students"])
+
+
+def _parse_class_fee(school: School, class_name: str) -> float | None:
+    """
+    Reads the school's class-wise fee structure (stored as lines like
+    "Class 1:1500") and returns the fee for the given class, or None if that
+    class has no fee configured. Matching is case-insensitive and ignores
+    surrounding spaces so "1", "Class 1", "class 1 " all behave sensibly as
+    long as they match how the admin wrote it in Settings.
+    """
+    if not school.fee_structure or not class_name:
+        return None
+    target = class_name.strip().lower()
+    for line in school.fee_structure.split("\n"):
+        if ":" not in line:
+            continue
+        cls, amount = line.split(":", 1)
+        if cls.strip().lower() == target:
+            try:
+                value = float(amount.strip())
+                return value if value > 0 else None
+            except ValueError:
+                return None
+    return None
+
+
+def _auto_create_fee_for_student(db: Session, school: School, student: Student) -> None:
+    """
+    When a student is added, if their class has a fee configured in the
+    school's fee structure, create this month's fee row automatically so the
+    admin doesn't have to add it by hand. Silent no-op when no fee is set for
+    that class — never blocks student creation.
+    """
+    amount = _parse_class_fee(school, student.class_name)
+    if amount is None:
+        return
+
+    current_month = date.today().strftime("%Y-%m")
+
+    # Don't double-create if a fee for this student + month already exists.
+    already = (
+        db.query(Fee)
+        .filter(
+            Fee.school_id == school.id,
+            Fee.student_id == student.id,
+            Fee.month == current_month,
+        )
+        .first()
+    )
+    if already:
+        return
+
+    due_day = school.fee_due_day or 10
+    try:
+        due = date(date.today().year, date.today().month, min(due_day, 28))
+    except ValueError:
+        due = None
+
+    fee = Fee(
+        school_id=school.id,
+        student_id=student.id,
+        fee_name=f"Monthly Fee - {current_month}",
+        amount=amount,
+        due_amount=amount,
+        paid_amount=0.0,
+        due_date=due,
+        month=current_month,
+        status=FeeStatus.pending,
+    )
+    db.add(fee)
 
 
 @router.get("", response_model=list[StudentOut])
@@ -203,6 +274,13 @@ def create_student(
         **data,
     )
     db.add(student)
+    db.flush()  # get student.id before creating the linked fee
+
+    # Auto-assign this month's fee based on the class fee structure (if set).
+    school = db.query(School).filter(School.id == token["school_id"]).first()
+    if school:
+        _auto_create_fee_for_student(db, school, student)
+
     db.commit()
     db.refresh(student)
     return student
