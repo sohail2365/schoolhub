@@ -1175,7 +1175,40 @@
                                 <label>School Phone</label>
                                 <input type="text" id="settingsPhone" placeholder="Enter school phone">
                             </div>
-                            <button class="btn btn-primary" onclick="saveSettings()">💾 Save Settings</button>
+                            <div class="form-group" style="margin-bottom: 20px;">
+                                <label>School Address (print par bhi aata hai)</label>
+                                <input type="text" id="settingsAddress" placeholder="Enter school address">
+                            </div>
+                            <button class="btn btn-primary" onclick="saveSettings()">💾 Save School Info</button>
+                        </div>
+                    </div>
+
+                    <!-- Class-wise Fee Settings -->
+                    <div class="card" style="margin-top:20px;">
+                        <div class="card-header">
+                            <h3 class="card-title">💰 Class-wise Monthly Fee</h3>
+                        </div>
+                        <div class="card-body">
+                            <p style="color:#64748b; font-size:0.9rem; margin-bottom:14px;">
+                                Har class ki monthly fee yahan set karein. Jab us class ka naya student add hoga,
+                                us mahine ki fee automatically ban jayegi.
+                            </p>
+                            <div class="form-group" style="margin-bottom:14px; max-width:260px;">
+                                <label>Fee Due Day (mahine ka konsa din)</label>
+                                <input type="number" id="settingsFeeDueDay" min="1" max="31" placeholder="e.g. 10">
+                            </div>
+                            <table style="width:100%; border-collapse:collapse; margin-bottom:14px;">
+                                <thead>
+                                    <tr style="background:#f1f5f9;">
+                                        <th style="text-align:left; padding:8px; border:1px solid #e2e8f0;">Class</th>
+                                        <th style="text-align:left; padding:8px; border:1px solid #e2e8f0;">Monthly Fee (Rs.)</th>
+                                        <th style="padding:8px; border:1px solid #e2e8f0; width:50px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="feeStructureRows"></tbody>
+                            </table>
+                            <button class="btn btn-secondary btn-sm" onclick="addFeeRow()" style="margin-right:8px;">➕ Add Class</button>
+                            <button class="btn btn-primary" onclick="saveFeeSettings()">💾 Save Fee Structure</button>
                         </div>
                     </div>
                 </div>
@@ -1797,6 +1830,9 @@
                         break;
                     case "announcements":
                         await loadAnnouncements();
+                        break;
+                    case "settings":
+                        await loadSettings();
                         break;
                 }
             } catch (error) {
@@ -3501,8 +3537,82 @@
         }
 
         // ==================== SETTINGS ====================
+        async function loadSettings() {
+            try {
+                const s = await apiRequest("/settings/school");
+                document.getElementById("settingsSchoolName").value = s.name || "";
+                document.getElementById("settingsEmail").value = s.email || "";
+                document.getElementById("settingsPhone").value = s.phone || "";
+                const addr = document.getElementById("settingsAddress");
+                if (addr) addr.value = s.address || "";
+            } catch (e) { /* ignore */ }
+
+            // Load class-wise fees
+            try {
+                const f = await apiRequest("/settings/fees");
+                document.getElementById("settingsFeeDueDay").value = f.fee_due_day || "";
+                const rows = (f.fee_structure || []);
+                document.getElementById("feeStructureRows").innerHTML = "";
+                if (rows.length === 0) {
+                    addFeeRow();
+                } else {
+                    rows.forEach(r => addFeeRow(r.class, r.amount));
+                }
+            } catch (e) {
+                document.getElementById("feeStructureRows").innerHTML = "";
+                addFeeRow();
+            }
+        }
+
+        function addFeeRow(className = "", amount = "") {
+            const tbody = document.getElementById("feeStructureRows");
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td style="padding:6px; border:1px solid #e2e8f0;">
+                    <input type="text" class="fee-class" value="${className}" placeholder="e.g. 1" style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px;">
+                </td>
+                <td style="padding:6px; border:1px solid #e2e8f0;">
+                    <input type="number" class="fee-amount" value="${amount}" placeholder="e.g. 1500" style="width:100%; padding:6px; border:1px solid #ddd; border-radius:4px;">
+                </td>
+                <td style="padding:6px; border:1px solid #e2e8f0; text-align:center;">
+                    <button onclick="this.closest('tr').remove()" style="background:#dc2626; color:#fff; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">✕</button>
+                </td>`;
+            tbody.appendChild(tr);
+        }
+
         async function saveSettings() {
-            showAlert("Settings saved successfully");
+            try {
+                const payload = {
+                    name: document.getElementById("settingsSchoolName").value.trim(),
+                    phone: document.getElementById("settingsPhone").value.trim(),
+                };
+                const addr = document.getElementById("settingsAddress");
+                if (addr) payload.address = addr.value.trim();
+                await apiRequest("/settings/school", { method: "PUT", body: JSON.stringify(payload) });
+                showAlert("School info saved successfully");
+            } catch (e) {
+                showAlert("Could not save: " + e.message, "error");
+            }
+        }
+
+        async function saveFeeSettings() {
+            try {
+                const classes = document.querySelectorAll(".fee-class");
+                const amounts = document.querySelectorAll(".fee-amount");
+                const lines = [];
+                for (let i = 0; i < classes.length; i++) {
+                    const c = classes[i].value.trim();
+                    const a = amounts[i].value.trim();
+                    if (c && a) lines.push(`${c}:${a}`);
+                }
+                const dueDay = parseInt(document.getElementById("settingsFeeDueDay").value) || null;
+                const payload = { fee_structure: lines.join("\n") };
+                if (dueDay) payload.fee_due_day = dueDay;
+                await apiRequest("/settings/fees", { method: "PUT", body: JSON.stringify(payload) });
+                showAlert("Fee structure saved. Naye students par yeh fee auto-apply hogi.");
+            } catch (e) {
+                showAlert("Could not save fees: " + e.message, "error");
+            }
         }
 
         // ==================== AUTH ====================
@@ -3654,7 +3764,7 @@
             try {
                 cachedSchoolProfile = await apiRequest("/schools/profile");
             } catch (error) {
-                cachedSchoolProfile = { name: "School", address: "", phone: "" };
+                cachedSchoolProfile = { name: "School", address: "", phone: "", email: "" };
             }
             return cachedSchoolProfile;
         }
@@ -3710,7 +3820,7 @@
                 <div class="header">
                     <h1>${school.name || "School"}</h1>
                     <div>${school.address || ""}</div>
-                    <div>${school.phone || ""}</div>
+                    <div>${school.phone ? "📞 " + school.phone : ""}${school.phone && school.email ? " · " : ""}${school.email ? "✉️ " + school.email : ""}</div>
                     <h2 style="margin-top:14px;">Report Card</h2>
                 </div>
                 <div class="meta">
@@ -3807,7 +3917,10 @@
             const bodyHtml = `
                 <div style="width:340px; border:2px solid #333; border-radius:10px; padding:16px; margin:0 auto; text-align:center; font-family:Arial, sans-serif;">
                     <div style="font-weight:700; font-size:16px;">${school.name || "School"}</div>
-                    <div style="font-size:11px; color:#555; margin-bottom:10px;">${school.address || ""}</div>
+                    <div style="font-size:11px; color:#555;">${school.address || ""}</div>
+                    <div style="font-size:11px; color:#555; margin-bottom:10px;">
+                        ${school.phone ? "📞 " + school.phone : ""}${school.phone && school.email ? " · " : ""}${school.email ? "✉️ " + school.email : ""}
+                    </div>
                     ${photoHtml}
                     <div style="font-weight:700; font-size:15px; margin-top:8px;">${s.name}</div>
                     <div style="font-size:13px; margin-top:6px; text-align:left; padding:0 10px;">
@@ -3831,7 +3944,7 @@
                 <div class="header">
                     <h1>${school.name || "School"}</h1>
                     <div>${school.address || ""}</div>
-                    <div>${school.phone || ""}</div>
+                    <div>${school.phone ? "📞 " + school.phone : ""}${school.phone && school.email ? " · " : ""}${school.email ? "✉️ " + school.email : ""}</div>
                     <h2 style="margin-top:14px;">Admission Slip</h2>
                 </div>
                 <table>
