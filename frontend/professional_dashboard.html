@@ -3764,18 +3764,44 @@
 
             // Fetch a signed link to the uploaded card photo, if one exists.
             let photoHtml = `<div style="width:80px; height:80px; border:1px solid #999; border-radius:50%; margin:10px auto; display:flex; align-items:center; justify-content:center; font-size:11px; color:#999;">Photo</div>`;
-            if (s.photo_url) {
+
+            async function resolvePhotoUrl() {
+                // Path 1: student record already has a canonical photo_url.
+                if (s.photo_url) {
+                    try {
+                        const resp = await fetch(`${API_BASE}/students/${s.id}/photo-url`, {
+                            headers: { Authorization: `Bearer ${getToken()}` },
+                        });
+                        if (resp.ok) return (await resp.json()).url;
+                    } catch (e) { /* fall through to documents */ }
+                }
+                // Path 2: no photo_url set (e.g. photo uploaded before this was
+                // linked) — look for a profile_photo document instead and use
+                // the newest one. Keeps old uploads working on the card.
                 try {
-                    const resp = await fetch(`${API_BASE}/students/${s.id}/photo-url`, {
+                    const docsResp = await fetch(`${API_BASE}/students/${s.id}/documents?doc_type=profile_photo`, {
                         headers: { Authorization: `Bearer ${getToken()}` },
                     });
-                    if (resp.ok) {
-                        const { url } = await resp.json();
-                        photoHtml = `<img src="${url}" style="width:80px; height:80px; border-radius:50%; object-fit:cover; margin:10px auto; display:block; border:1px solid #999;" />`;
+                    if (docsResp.ok) {
+                        const docs = await docsResp.json();
+                        if (Array.isArray(docs) && docs.length > 0) {
+                            const urlResp = await fetch(`${API_BASE}/students/${s.id}/documents/${docs[0].id}/url`, {
+                                headers: { Authorization: `Bearer ${getToken()}` },
+                            });
+                            if (urlResp.ok) return (await urlResp.json()).url;
+                        }
                     }
-                } catch (e) {
-                    // Signed URL fetch failed (e.g. storage not configured) — fall back to placeholder silently.
+                } catch (e) { /* leave placeholder */ }
+                return null;
+            }
+
+            try {
+                const photoUrl = await resolvePhotoUrl();
+                if (photoUrl) {
+                    photoHtml = `<img src="${photoUrl}" style="width:80px; height:80px; border-radius:50%; object-fit:cover; margin:10px auto; display:block; border:1px solid #999;" />`;
                 }
+            } catch (e) {
+                // Any failure -> keep the "Photo" placeholder, card still prints.
             }
 
             const bodyHtml = `
