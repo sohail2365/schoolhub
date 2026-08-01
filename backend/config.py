@@ -9,7 +9,7 @@ class Settings(BaseSettings):
 
     JWT_SECRET: str = "replace_with_a_strong_random_secret"
     JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRE_MINUTES: int = 10080  # 7 days
+    JWT_EXPIRE_MINUTES: int = 4320  # 3 days
 
     CORS_ORIGINS: str = "*"
     LOG_FILE: str = "logs/app.log"
@@ -64,6 +64,12 @@ class Settings(BaseSettings):
     # in the Sentry dashboard — set it to "production" / "staging" per env.
     SENTRY_DSN: str = ""
     SENTRY_ENVIRONMENT: str = "production"
+
+    # Backup export endpoint (/backup/export) is protected by this secret,
+    # sent as the X-Backup-Secret header. If empty, the endpoint is disabled
+    # (returns 503) so data is never exposed by accident. Set a long random
+    # value in Vercel env vars to enable scheduled backups.
+    BACKUP_SECRET: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env",

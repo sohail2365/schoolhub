@@ -1,7 +1,7 @@
 import secrets
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from backend.config import settings
 from backend.database import get_db
@@ -20,11 +20,14 @@ from backend.schemas.user import (
 from backend.utils.email import send_password_reset_email
 from backend.utils.jwt_handler import create_access_token, decode_token
 from backend.utils.password import hash_password, validate_password_strength, verify_password
+from backend.utils.rate_limit import enforce_rate_limit
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
-def register_school(payload: SchoolRegisterRequest, db: Session = Depends(get_db)):
+def register_school(payload: SchoolRegisterRequest, request: Request, db: Session = Depends(get_db)):
+    # Max 5 new registrations per IP per hour — stops automated signup spam.
+    enforce_rate_limit(request, db, action="register", max_requests=5, window_seconds=3600)
     validate_password_strength(payload.password)
 
     if db.query(School).filter(School.email == payload.email).first():
@@ -60,7 +63,11 @@ def register_school(payload: SchoolRegisterRequest, db: Session = Depends(get_db
     )
 
 @router.post("/login", response_model=AuthResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)):
+def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
+    # Max 20 login attempts per IP per 5 minutes — stops one IP from spraying
+    # guesses across many different accounts (per-account lockout handles
+    # repeated guesses against a single account).
+    enforce_rate_limit(request, db, action="login", max_requests=20, window_seconds=300)
     user = db.query(User).filter(User.email == payload.email).first()
 
     # Same generic error for "no such user" and "locked out" — don't leak
@@ -114,7 +121,9 @@ def refresh_token(payload: RefreshRequest):
     return RefreshResponse(new_access_token=token)
 
 @router.post("/forgot-password")
-def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+def forgot_password(payload: ForgotPasswordRequest, request: Request, db: Session = Depends(get_db)):
+    # Max 5 reset requests per IP per 15 min — stops reset-email spam/abuse.
+    enforce_rate_limit(request, db, action="forgot_password", max_requests=5, window_seconds=900)
     user = db.query(User).filter(User.email == payload.email).first()
 
     # Always return the same response whether or not the email exists —
